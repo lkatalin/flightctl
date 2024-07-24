@@ -995,6 +995,18 @@ type TemplateVersionStatus_Config_Item struct {
 	union json.RawMessage
 }
 
+// ListCertSigningRequestsParams defines parameters for ListCertSigningRequests.
+type ListCertSigningRequestsParams struct {
+	// Continue An optional parameter to query more results from the server. The value of the paramter must match the value of the 'continue' field in the previous list response.
+	Continue *string `form:"continue,omitempty" json:"continue,omitempty"`
+
+	// LabelSelector A selector to restrict the list of returned objects by their labels. Defaults to everything.
+	LabelSelector *string `form:"labelSelector,omitempty" json:"labelSelector,omitempty"`
+
+	// Limit The maximum number of results returned in the list response. The server will set the 'continue' field in the list response if more results exist. The continue value may then be specified as parameter in a subsequent query.
+	Limit *int32 `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListDevicesParams defines parameters for ListDevices.
 type ListDevicesParams struct {
 	// Continue An optional parameter to query more results from the server. The value of the paramter must match the value of the 'continue' field in the previous list response.
@@ -1086,6 +1098,18 @@ type ListResourceSyncParams struct {
 type TokenValidateParams struct {
 	Authentication *string `json:"Authentication,omitempty"`
 }
+
+// CreateCertSigningRequestJSONRequestBody defines body for CreateCertSigningRequest for application/json ContentType.
+type CreateCertSigningRequestJSONRequestBody = CertSigningRequest
+
+// ReplaceCertSigningRequestJSONRequestBody defines body for ReplaceCertSigningRequest for application/json ContentType.
+type ReplaceCertSigningRequestJSONRequestBody = CertSigningRequest
+
+// CreateCertSigningRequestApprovalJSONRequestBody defines body for CreateCertSigningRequestApproval for application/json ContentType.
+type CreateCertSigningRequestApprovalJSONRequestBody = CertSigningRequestApproval
+
+// ReplaceCertSigningRequestStatusJSONRequestBody defines body for ReplaceCertSigningRequestStatus for application/json ContentType.
+type ReplaceCertSigningRequestStatusJSONRequestBody = CertSigningRequest
 
 // CreateDeviceJSONRequestBody defines body for CreateDevice for application/json ContentType.
 type CreateDeviceJSONRequestBody = Device
