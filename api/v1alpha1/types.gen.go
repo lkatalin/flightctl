@@ -29,6 +29,13 @@ const (
 	ApplicationsSummaryStatusUnknown  ApplicationsSummaryStatusType = "Unknown"
 )
 
+// Defines values for CertificateSigningRequestUsages.
+const (
+	Agent      CertificateSigningRequestUsages = "Agent"
+	Enrollment CertificateSigningRequestUsages = "Enrollment"
+	Renewal    CertificateSigningRequestUsages = "Renewal"
+)
+
 // Defines values for ConditionStatus.
 const (
 	ConditionStatusFalse   ConditionStatus = "False"
@@ -38,17 +45,20 @@ const (
 
 // Defines values for ConditionType.
 const (
-	DeviceMultipleOwners       ConditionType = "MultipleOwners"
-	DeviceSpecValid            ConditionType = "SpecValid"
-	DeviceUpdating             ConditionType = "Updating"
-	EnrollmentRequestApproved  ConditionType = "Approved"
-	FleetOverlappingSelectors  ConditionType = "OverlappingSelectors"
-	FleetValid                 ConditionType = "Valid"
-	RepositoryAccessible       ConditionType = "Accessible"
-	ResourceSyncAccessible     ConditionType = "Accessible"
-	ResourceSyncResourceParsed ConditionType = "ResourceParsed"
-	ResourceSyncSynced         ConditionType = "Synced"
-	TemplateVersionValid       ConditionType = "Valid"
+	CertificateSigningRequestApproved ConditionType = "CertificateApproved"
+	CertificateSigningRequestDenied   ConditionType = "Denied"
+	CertificateSigningRequestFailed   ConditionType = "Failed"
+	DeviceMultipleOwners              ConditionType = "MultipleOwners"
+	DeviceSpecValid                   ConditionType = "SpecValid"
+	DeviceUpdating                    ConditionType = "Updating"
+	EnrollmentRequestApproved         ConditionType = "Approved"
+	FleetOverlappingSelectors         ConditionType = "OverlappingSelectors"
+	FleetValid                        ConditionType = "Valid"
+	RepositoryAccessible              ConditionType = "Accessible"
+	ResourceSyncAccessible            ConditionType = "Accessible"
+	ResourceSyncResourceParsed        ConditionType = "ResourceParsed"
+	ResourceSyncSynced                ConditionType = "Synced"
+	TemplateVersionValid              ConditionType = "Valid"
 )
 
 // Defines values for DeviceIntegrityStatusSummaryType.
@@ -142,6 +152,90 @@ type ApplicationsSummaryStatusType string
 
 // CPUResourceMonitorSpec defines model for CPUResourceMonitorSpec.
 type CPUResourceMonitorSpec = ResourceMonitorSpec
+
+// CertificateSigningRequest CertificateSigningRequest represents a request for a signed certificate from the CA
+type CertificateSigningRequest struct {
+	// ApiVersion APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+	ApiVersion string `json:"apiVersion"`
+
+	// Kind Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	Kind string `json:"kind"`
+
+	// Metadata ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.
+	Metadata ObjectMeta `json:"metadata"`
+
+	// Spec Wrapper around a user-created CSR, modeled on kubernetes io.k8s.api.certificates.v1.CertificateSigningRequestSpec
+	Spec CertificateSigningRequestSpec `json:"spec"`
+
+	// Status Indicates approval/denial/failure status of the CSR, and contains the issued certifiate if any exists
+	Status *CertificateSigningRequestStatus `json:"status,omitempty"`
+}
+
+// CertificateSigningRequestApproval defines model for CertificateSigningRequestApproval.
+type CertificateSigningRequestApproval struct {
+	// Approved approved indicates whether the request has been approved.
+	Approved bool `json:"approved"`
+
+	// ApprovedAt approvedAt is the time at which the request was approved.
+	ApprovedAt *time.Time `json:"approvedAt,omitempty"`
+
+	// ApprovedBy approvedBy is the name of the approver.
+	ApprovedBy *string `json:"approvedBy,omitempty"`
+}
+
+// CertificateSigningRequestList CertificateSigningRequestList is a list of CertificateSigningRequest
+type CertificateSigningRequestList struct {
+	// ApiVersion APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+	ApiVersion string `json:"apiVersion"`
+
+	// Items List of CertificateSigningRequest.
+	Items []CertificateSigningRequest `json:"items"`
+
+	// Kind Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	Kind string `json:"kind"`
+
+	// Metadata ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.
+	Metadata ListMeta `json:"metadata"`
+}
+
+// CertificateSigningRequestSpec Wrapper around a user-created CSR, modeled on kubernetes io.k8s.api.certificates.v1.CertificateSigningRequestSpec
+type CertificateSigningRequestSpec struct {
+	// ExpirationSeconds Requested duration of validity for the certificate
+	ExpirationSeconds *interface{} `json:"expirationSeconds,omitempty"`
+
+	// Extra Extra attributes of the user that created the CSR, populated by the API server on creation and immutable
+	Extra *map[string][]string `json:"extra,omitempty"`
+
+	// Groups Group membership of the user that created the CSR, populated by the API server on creation and immutable
+	Groups *[]string `json:"groups,omitempty"`
+
+	// Request The base64-encoded PEM-encoded PKCS#10 CSR. Matches the spec.request field in a kubernetes CertificateSigningRequest resource
+	Request []byte `json:"request"`
+
+	// SignerName Indicates the requested signer, and is a qualified name
+	SignerName string `json:"signerName"`
+
+	// Uid UID of the user that created the CSR, populated by the API server on creation and immutable
+	Uid *string `json:"uid,omitempty"`
+
+	// Usage Purpose or scope of the requested certificate
+	Usage *CertificateSigningRequestUsages `json:"usage,omitempty"`
+
+	// Username Name of the user that created the CSR, populated by the API server on creation and immutable
+	Username *string `json:"username,omitempty"`
+}
+
+// CertificateSigningRequestStatus Indicates approval/denial/failure status of the CSR, and contains the issued certifiate if any exists
+type CertificateSigningRequestStatus struct {
+	// Certificate The issued signed certificate, immutable once populated
+	Certificate *[]byte `json:"certificate,omitempty"`
+
+	// Conditions Information about the certificate and CSR
+	Conditions *[]Condition `json:"conditions,omitempty"`
+}
+
+// CertificateSigningRequestUsages Purpose or scope of the requested certificate
+type CertificateSigningRequestUsages string
 
 // Condition Condition contains details for one aspect of the current state of this API Resource.
 type Condition struct {
