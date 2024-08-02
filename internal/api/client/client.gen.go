@@ -4279,7 +4279,6 @@ func (r ListCertificateSigningRequestsResponse) StatusCode() int {
 type CreateCertificateSigningRequestResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *interface{}
 	JSON201      *CertificateSigningRequest
 	JSON202      *CertificateSigningRequest
 	JSON401      *Error
@@ -6478,13 +6477,6 @@ func ParseCreateCertificateSigningRequestResponse(rsp *http.Response) (*CreateCe
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest interface{}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest CertificateSigningRequest
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

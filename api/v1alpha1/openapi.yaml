@@ -1367,12 +1367,15 @@ paths:
       responses:
       # TODO - do we want "208" already reported, "400" bad request, "409" status conflict? Enrollment Request has these
       # https://github.com/kubernetes/kubernetes/blob/f8d5b2074c9b3a1629ef085b9e17a5370f393732/api/openapi-spec/v3/apis__certificates.k8s.io__v1_openapi.json#L1783
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                ref: '#/components/schemas/CertificateSigningRequest'
+      #
+      # removed 200 as it gives an invalid reciever type error - in server.gen.go the 200JSONResponse type is interface{} 
+      # enrollment request does not have this, but k8s does 
+      #"200": 
+      #    description: OK
+      #    content:
+      #      application/json:
+      #        schema:
+      #          ref: '#/components/schemas/CertificateSigningRequest'
         "201":
           description: Created
           content:
@@ -3488,7 +3491,7 @@ components:
       properties:
         certificate:
           description: 'The issued signed certificate, immutable once populated'
-          # format: byte # TODO - add this back in to match k8s
+          format: byte # TODO - add this back in to match k8s
           type: string
         conditions:
           description: 'Conditions applied to the request. Known conditions are Approved, Denied, and Failed'

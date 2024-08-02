@@ -206,7 +206,7 @@ type CertificateSigningRequestSpec struct {
 // CertificateSigningRequestStatus Indicates approval/denial/failure status of the CSR, and contains the issued certifiate if any exists
 type CertificateSigningRequestStatus struct {
 	// Certificate The issued signed certificate, immutable once populated
-	Certificate *string `json:"certificate,omitempty"`
+	Certificate *[]byte `json:"certificate,omitempty"`
 
 	// Conditions Conditions applied to the request. Known conditions are Approved, Denied, and Failed
 	Conditions []Condition `json:"conditions"`
