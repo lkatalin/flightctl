@@ -5,4 +5,7 @@ metadata:
 spec:
   expirationSeconds: 600
   request: cmVxdWVzdCBzdHJpbmc=
-  signerName: signer
+  signerName: ca
+  usages:
+    - CA:false
+    - client auth
