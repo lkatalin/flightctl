@@ -129,7 +129,7 @@ func ValidateCSRUsages(u *[]string) []error {
 		for i, r := range requiredAllOf {
 			if usage == r {
 				// remove fulfilled req from list
-				requiredAllOf = append(requiredAllOf[:i], requiredAllOf[i+1])
+				requiredAllOf = append(requiredAllOf[:i], requiredAllOf[i+1:]...)
 			}
 		}
 	}
