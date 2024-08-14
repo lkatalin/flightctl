@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/flightctl/flightctl/internal/crypto"
 	k8sapivalidation "k8s.io/apimachinery/pkg/api/validation"
 	k8smetav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	k8sutilvalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -105,6 +106,68 @@ func ValidateBearerToken(token *string, path string) []error {
 		}
 	}
 	return asErrors(errs)
+}
+
+func ValidateCSRUsages(u *[]string) []error {
+	errs := field.ErrorList{}
+	requiredAllOf := []string{"client auth", "CA:false"}
+	notAllowed := []string{}
+
+	for _, usage := range *u {
+		for _, na := range notAllowed {
+			if usage == na {
+				err := fmt.Sprintf("usage not allowed: %s\n", na)
+				errs = append(errs, field.Invalid(fieldPathFor("spec.usages"), u, err))
+			}
+		}
+		for i, r := range requiredAllOf {
+			if usage == r {
+				// remove fulfilled req from list
+				requiredAllOf = append(requiredAllOf[:i], requiredAllOf[i+1:]...)
+			}
+		}
+	}
+	if len(requiredAllOf) > 0 {
+		err := fmt.Sprintf("required usages must be present in request: %s\n", requiredAllOf)
+		errs = append(errs, field.Invalid(fieldPathFor("spec.usages"), u, err))
+	}
+	return asErrors(errs)
+}
+
+// NOTE: ValidateSignerName will not error and is a placeholder for when FC has multiple signers.
+// Currently every request is sent to the only signer, named "ca" and defined in cmd/flightctl-api/main.go
+func ValidateSignerName(s string) []error {
+	_errs := field.ErrorList{}
+
+	_validSigners := []string{"ca"}
+
+	for _, signer := range _validSigners {
+		if s == signer {
+			return nil
+		}
+	}
+
+	_errs = append(_errs, field.Invalid(fieldPathFor("spec.signerName"), s, "must specify a valid signer"))
+	//return asErrors(errs)
+	return nil
+}
+
+func ValidateExpirationSeconds(e *int32) []error {
+	if *e < 600 {
+		fmt.Println("WARNING: recommended minimum for ExpirationSeconds is 600")
+	}
+	return nil
+}
+
+func ValidateCSR(csr []byte) []error {
+	errs := field.ErrorList{}
+
+	_, err := crypto.ParseCSR(csr)
+	if err != nil {
+		errs = append(errs, field.Invalid(fieldPathFor("spec.request"), csr, err.Error()))
+		return asErrors(errs)
+	}
+	return nil
 }
 
 func fieldPathFor(path string) *field.Path {

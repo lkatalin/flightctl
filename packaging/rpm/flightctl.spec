@@ -2,7 +2,7 @@
 
 Name: flightctl
 Version: 0.0.1
-Release: 4%{?dist}
+Release: 4.20240815160216400489.csr.aug.15%{?dist}
 Summary: Flightctl CLI
 
 License: XXX
@@ -57,6 +57,12 @@ cp packaging/systemd/flightctl-agent.service %{buildroot}/usr/lib/systemd/system
 /usr/lib/greenboot/check/required.d/20_check_flightctl_agent.sh
 
 %changelog
+* Thu Aug 15 2024 Lily Sturmann <lkatalin@users.noreply.github.com> - 0.0.1-4.20240815160216400489.csr.aug.15
+- Development snapshot (b193ac7b)
+
+* Thu Aug 15 2024 Lily Sturmann <lkatalin@users.noreply.github.com> - 0.0.1-4.20240815155837023155.csr.aug.15
+- Development snapshot (b193ac7b)
+
 * Wed Mar 13 2024 Ricardo Noriega <rnoriega@redhat.com> - 0.0.1-3
 - New specfile for both CLI and agent packages
 * Wed Aug 7 2024 Sam Batschelet <sbatsche@redhat.com> - 0.0.1-4
