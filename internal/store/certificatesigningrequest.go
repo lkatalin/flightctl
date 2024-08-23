@@ -164,7 +164,6 @@ func (s *CertificateSigningRequestStore) createOrUpdate(orgId uuid.UUID, resourc
 		return nil, false, false, err
 	}
 	certificatesigningrequest.OrgID = orgId
-	certificatesigningrequest.Status = nil
 
 	existingRecord, err := getExistingRecord[model.CertificateSigningRequest](s.db, certificatesigningrequest.Name, orgId)
 	if err != nil {
