@@ -298,6 +298,7 @@ func (h *ServiceHandler) ApproveCertificateSigningRequest(ctx context.Context, r
 	case flterrors.ErrNoRowsUpdated, flterrors.ErrResourceVersionConflict:
 		return server.ApproveCertificateSigningRequest409JSONResponse{Message: err.Error()}, nil
 	default:
+		h.log.Error("error updating CSR status: %v", err)
 		return nil, err
 	}
 }
