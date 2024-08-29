@@ -2865,6 +2865,24 @@ func (response ApproveCertificateSigningRequest409JSONResponse) VisitApproveCert
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ApproveCertificateSigningRequest422JSONResponse Error
+
+func (response ApproveCertificateSigningRequest422JSONResponse) VisitApproveCertificateSigningRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApproveCertificateSigningRequest500JSONResponse Error
+
+func (response ApproveCertificateSigningRequest500JSONResponse) VisitApproveCertificateSigningRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type DeleteDevicesRequestObject struct {
 }
 

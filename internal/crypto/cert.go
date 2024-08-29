@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/flightctl/flightctl/internal/flterrors"
 	oscrypto "github.com/openshift/library-go/pkg/crypto"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -24,7 +25,7 @@ const DeviceCommonNamePrefix = "device:"
 
 func BootrapCNFromName(name string) (string, error) {
 	if len(name) < 16 {
-		return "", errors.New("subject common name (uuid) must have 16 characters at least")
+		return "", flterrors.ErrCNLength
 	}
 	return ClientBootstrapCommonNamePrefix + name, nil
 }
