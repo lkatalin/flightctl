@@ -1674,6 +1674,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        "422":
+          description: UnprocessableEntity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: InternalServerError
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       description: deny the specified CertificateSigningRequest
       operationId: denyCertificateSigningRequest

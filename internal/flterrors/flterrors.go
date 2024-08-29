@@ -21,6 +21,11 @@ var (
 	ErrTemplateVersionIsNil   = errors.New("spec.templateVersion not set")
 	ErrInvalidTemplateVersion = errors.New("device's templateVersion is not valid")
 	ErrNoRenderedVersion      = errors.New("no rendered version for device")
+
+	// csr
+	ErrInvalidPEMBlock	  = errors.New("not a valid PEM block")
+	ErrUnknownPEMType	  = errors.New("unknown PEM type")
+	ErrCNLength		  = errors.New("CN must be at least 16 chars")
 )
 
 func ErrorFromGormError(err error) error {

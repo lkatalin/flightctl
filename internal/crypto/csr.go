@@ -12,6 +12,8 @@ import (
 	"time"
 
 	oscrypto "github.com/openshift/library-go/pkg/crypto"
+
+	"github.com/flightctl/flightctl/internal/flterrors"
 )
 
 func MakeCSR(privateKey crypto.Signer, subjectName string) ([]byte, error) {
@@ -37,9 +39,11 @@ func ParseCSR(csrPEM []byte) (*x509.CertificateRequest, error) {
 	block, rest := pem.Decode(csrPEM)
 	switch {
 	case block == nil:
-		return nil, fmt.Errorf("not a valid PEM encoded block")
+		return nil, flterrors.ErrInvalidPEMBlock
+		//return nil, fmt.Errorf("not a valid PEM encoded block")
 	case len(bytes.TrimSpace(rest)) > 0:
-		return nil, fmt.Errorf("not a valid PEM encoded block")
+		return nil, flterrors.ErrInvalidPEMBlock
+		//return nil, fmt.Errorf("not a valid PEM encoded block")
 	}
 
 	var csr *x509.CertificateRequest
@@ -48,7 +52,8 @@ func ParseCSR(csrPEM []byte) (*x509.CertificateRequest, error) {
 	case "CERTIFICATE REQUEST":
 		csr, err = x509.ParseCertificateRequest(block.Bytes)
 	default:
-		return nil, fmt.Errorf("unknown PEM type: %s", block.Type)
+		return nil, fmt.Errorf("unknown PEM type: %s", block.Type, flterrors.ErrUnknownPEMType)
+		//return nil, fmt.Errorf("unknown PEM type: %s", block.Type)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error parsing CSR: %v", err)

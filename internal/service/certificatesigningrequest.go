@@ -264,7 +264,9 @@ func (h *ServiceHandler) ApproveCertificateSigningRequest(ctx context.Context, r
 		if errors.Is(err, flterrors.ErrResourceNotFound) {
 			return server.ApproveCertificateSigningRequest404JSONResponse{}, nil
 		}
-		return nil, err
+		h.log.Error("error getting csr from DB: %v", err)
+		return server.ApproveCertificateSigningRequest500JSONResponse{Message: err.Error()}, nil
+		//return nil, err
 	}
 
 	if api.IsStatusConditionTrue(csr.Status.Conditions, api.CertificateSigningRequestDenied) {
@@ -276,7 +278,9 @@ func (h *ServiceHandler) ApproveCertificateSigningRequest(ctx context.Context, r
 
 	signedCert, err := signApprovedCertificateSigningRequest(h.ca, csr)
 	if err != nil {
-		return nil, err
+		h.log.Error("error signing approved csr: %v", err)
+		return server.ApproveCertificateSigningRequest500JSONResponse{Message: err.Error()}, nil
+		//return nil, err
 	}
 
 	approvedCondition := api.Condition{
@@ -299,7 +303,8 @@ func (h *ServiceHandler) ApproveCertificateSigningRequest(ctx context.Context, r
 		return server.ApproveCertificateSigningRequest409JSONResponse{Message: err.Error()}, nil
 	default:
 		h.log.Error("error updating CSR status: %v", err)
-		return nil, err
+		//return nil, err
+		return server.ApproveCertificateSigningRequest500JSONResponse{Message: err.Error()}, nil
 	}
 }
 

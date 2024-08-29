@@ -14,6 +14,8 @@ import (
 
 	oscrypto "github.com/openshift/library-go/pkg/crypto"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/flightctl/flightctl/internal/flterrors"
 )
 
 // Wraps openshift/library-go/pkg/crypto to use ECDSA and simplify the interface
@@ -24,7 +26,8 @@ const DeviceCommonNamePrefix = "device:"
 
 func BootrapCNFromName(name string) (string, error) {
 	if len(name) < 16 {
-		return "", errors.New("subject common name (uuid) must have 16 characters at least")
+		return "", fmt.Errorf("subject common name (uuid) too short: %w", name, flterrors.ErrCNLength)
+		//return "", errors.New("subject common name (uuid) must have 16 characters at least")
 	}
 	return ClientBootstrapCommonNamePrefix + name, nil
 }
