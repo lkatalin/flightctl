@@ -26,8 +26,9 @@ const DeviceCommonNamePrefix = "device:"
 
 func BootrapCNFromName(name string) (string, error) {
 	if len(name) < 16 {
-		return "", fmt.Errorf("subject common name (uuid) too short: %w", name, flterrors.ErrCNLength)
+		//return "", fmt.Errorf("subject common name (uuid) too short: %s", name, flterrors.ErrCNLength)
 		//return "", errors.New("subject common name (uuid) must have 16 characters at least")
+		return "", flterrors.NewErrCNLength(name, 16)
 	}
 	return ClientBootstrapCommonNamePrefix + name, nil
 }

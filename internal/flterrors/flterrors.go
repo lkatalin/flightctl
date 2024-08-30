@@ -2,6 +2,7 @@ package flterrors
 
 import (
 	"errors"
+	"fmt"
 
 	"gorm.io/gorm"
 )
@@ -25,7 +26,7 @@ var (
 	// csr
 	ErrInvalidPEMBlock	  = errors.New("not a valid PEM block")
 	ErrUnknownPEMType	  = errors.New("unknown PEM type")
-	ErrCNLength		  = errors.New("CN must be at least 16 chars")
+	//ErrCNLength		  = errors.New("CN must be at least 16 chars")
 )
 
 func ErrorFromGormError(err error) error {
@@ -38,5 +39,29 @@ func ErrorFromGormError(err error) error {
 		return ErrDuplicateName
 	default:
 		return err
+	}
+}
+
+type ErrCNLength struct{
+	cn string
+	min int
+}
+
+func (e *ErrCNLength) Error() string {
+	return fmt.Sprintf("CN: %s does not meet min length of %d characters", e.cn, e.min)
+}
+
+func (e *ErrCNLength) Is(target error) bool {
+        target, ok := target.(*Error)
+        if !ok{
+          return false
+        }
+        return e.Code == target.Code
+}
+
+func NewErrCNLength(cn string, min int) *ErrCNLength {
+	return &ErrCNLength{
+		cn: cn,
+		min: min,
 	}
 }

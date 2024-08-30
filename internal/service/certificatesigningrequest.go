@@ -41,7 +41,8 @@ func signApprovedCertificateSigningRequest(ca *crypto.CA, request *api.Certifica
 	}
 	csr.Subject.CommonName, err = crypto.BootrapCNFromName(u)
 	if err != nil {
-		return nil, fmt.Errorf("signApprovedCertificateRequest: error setting CN in CSR: %w", err)
+		// return 422 type
+		return nil, fmt.Errorf("error setting CN in CSR: %w", err.Error())
 	}
 
 	expiry := DefaultEnrollmentCertExpirySeconds
@@ -278,7 +279,10 @@ func (h *ServiceHandler) ApproveCertificateSigningRequest(ctx context.Context, r
 
 	signedCert, err := signApprovedCertificateSigningRequest(h.ca, csr)
 	if err != nil {
-		h.log.Error("error signing approved csr: %v", err)
+		//h.log.Error("error signing approved csr: %v", err)
+		if errors.Is(err, flterrors.ErrCNLength) {
+			return server.ApproveCertificateSigningRequest422JSONResponse{Message: err.Error()}, nil
+		}
 		return server.ApproveCertificateSigningRequest500JSONResponse{Message: err.Error()}, nil
 		//return nil, err
 	}
