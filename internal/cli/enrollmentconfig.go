@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/flightctl/flightctl/internal/client"
+	fccrypto "github.com/flightctl/flightctl/internal/crypto"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/yaml"
@@ -16,7 +17,8 @@ import (
 type EnrollmentConfigOptions struct {
 	GlobalOptions
 
-	PrivateKey string
+	PrivateKey      string
+	PrivKeyPassword string
 }
 
 func DefaultEnrollmentConfigOptions() *EnrollmentConfigOptions {
@@ -50,6 +52,7 @@ func (o *EnrollmentConfigOptions) Bind(fs *pflag.FlagSet) {
 	o.GlobalOptions.Bind(fs)
 
 	fs.StringVarP(&o.PrivateKey, "private-key", "p", o.PrivateKey, "Path to private key")
+	fs.StringVarP(&o.PrivKeyPassword, "password", "w", "", "Password to decrypt private key (optional)")
 }
 
 func (o *EnrollmentConfigOptions) Complete(cmd *cobra.Command, args []string) error {
@@ -90,6 +93,23 @@ func (o *EnrollmentConfigOptions) Run(ctx context.Context, args []string) error 
 		return fmt.Errorf("failed to get enrollment config: %w", err)
 	}
 
+	encrypted, err := fccrypto.IsEncryptedPEMKey(privKey)
+	if err != nil {
+		return fmt.Errorf("invalid key specified: path: %s, error %w", o.PrivateKey, err)
+	}
+	if encrypted {
+		if o.PrivKeyPassword == "" {
+			pw, err := getPassword()
+			if err != nil {
+				return err
+			}
+			o.PrivKeyPassword = string(pw)
+		}
+		privKey, err = fccrypto.DecryptKeyBytes(privKey, []byte(o.PrivKeyPassword))
+		if err != nil {
+			return fmt.Errorf("unable to decrypt key: %w", err)
+		}
+	}
 	response.JSON200.EnrollmentService.Authentication.ClientKeyData = base64.StdEncoding.EncodeToString(privKey)
 
 	marshalled, err := yaml.Marshal(response.JSON200)
