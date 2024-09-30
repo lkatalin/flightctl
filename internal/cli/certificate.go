@@ -43,7 +43,7 @@ type CertificateOptions struct {
 func DefaultCertificateOptions() *CertificateOptions {
 	return &CertificateOptions{
 		GlobalOptions: DefaultGlobalOptions(),
-		SignerName:    "ca",
+		SignerName:    "enrollment",
 		OutputFormat:  "components",
 	}
 }
