@@ -376,7 +376,7 @@ metadata:
   name: mycsr
 spec:
   request: <add base64-encoded CSR>
-  signerName: ca
+  signerName: enrollment
   usages: ["clientAuth", "CA:false"]
   expirationSeconds: 604800
 EOF
@@ -416,7 +416,7 @@ The certificate signing request will need to be approved. As an authorized user,
 flightctl approve csr/mycsr
 ```
 
-The Condition of the certificate signing request will then show:
+The Condition of the certificate signing request will then show (note the signerName will be updated to 'ca' - this is expected):
 
 ```console
 $ flightctl get csr/mycsr
