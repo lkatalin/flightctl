@@ -3015,6 +3015,15 @@ func (response ReplaceCertificateSigningRequest409JSONResponse) VisitReplaceCert
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ReplaceCertificateSigningRequest500JSONResponse Error
+
+func (response ReplaceCertificateSigningRequest500JSONResponse) VisitReplaceCertificateSigningRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type DenyCertificateSigningRequestRequestObject struct {
 	Name string `json:"name"`
 }
