@@ -133,6 +133,13 @@ func (h *ServiceHandler) ListCertificateSigningRequests(ctx context.Context, req
 func (h *ServiceHandler) CreateCertificateSigningRequest(ctx context.Context, request server.CreateCertificateSigningRequestRequestObject) (server.CreateCertificateSigningRequestResponseObject, error) {
 	orgId := store.NullOrgId
 
+	// check that the CSR does not already exist
+	_, err := h.store.CertificateSigningRequest().Get(ctx, orgId, *request.Body.Metadata.Name)
+	if !errors.Is(err, flterrors.ErrResourceNotFound) {
+		msg := fmt.Sprintf("could not create CSR resource: CSR with name %s already exists", *request.Body.Metadata.Name)
+		return server.CreateCertificateSigningRequest208JSONResponse{Message: msg}, nil
+	}
+
 	// don't set fields that are managed by the service
 	request.Body.Status = nil
 	common.NilOutManagedObjectMetaProperties(&request.Body.Metadata)
