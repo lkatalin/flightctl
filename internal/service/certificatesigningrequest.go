@@ -151,10 +151,20 @@ func (h *ServiceHandler) CreateCertificateSigningRequest(ctx context.Context, re
 	result, err := h.store.CertificateSigningRequest().Create(ctx, orgId, request.Body)
 	switch err {
 	case nil:
+		if request.Body.Spec.SignerName == "enrollment" {
+			approveReq := server.ApproveCertificateSigningRequestRequestObject{
+				Name: *request.Body.Metadata.Name,
+			}
+			approveResp, _ := h.ApproveCertificateSigningRequest(ctx, approveReq)
+			_, ok := approveResp.(server.ApproveCertificateSigningRequest200JSONResponse)
+			if !ok {
+				msg := fmt.Sprintf("enrollment CSR for %s could not be auto-approved: %s", *request.Body.Metadata.Name, approveResp)
+				return server.CreateCertificateSigningRequest500JSONResponse{Message: msg}, nil
+			}
+		}
 		return server.CreateCertificateSigningRequest201JSONResponse(*result), nil
 	case flterrors.ErrResourceIsNil:
 		return server.CreateCertificateSigningRequest400JSONResponse{Message: err.Error()}, nil
-
 	default:
 		return nil, err
 	}
