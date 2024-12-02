@@ -313,7 +313,7 @@ func (h *ServiceHandler) ApproveCertificateSigningRequest(ctx context.Context, r
 		return server.ApproveCertificateSigningRequest409JSONResponse{Message: "The request has already been denied"}, nil
 	}
 	if api.IsStatusConditionTrue(csr.Status.Conditions, api.CertificateSigningRequestApproved) {
-		return server.ApproveCertificateSigningRequest409JSONResponse{Message: "The request has already been approved"}, nil
+		return server.ApproveCertificateSigningRequest200JSONResponse{}, nil
 	}
 
 	signedCert, err := signApprovedCertificateSigningRequest(h.ca, *csr)
