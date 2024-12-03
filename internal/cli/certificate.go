@@ -128,27 +128,6 @@ func (o *CertificateOptions) Run(ctx context.Context, args []string) error {
 		return fmt.Errorf("creating new key pair: %w", err)
 	}
 
-	// write out the key asap - in case process is interrupted, key is needed to access
-	// status of CSR via enrollmentconfig API
-	keypath := o.OutputDir + name + ".key"
-	if !o.EncryptKey {
-		log.Infof("writing private key to: %s...\n", keypath)
-		err = fccrypto.WriteKey(keypath, priv)
-		if err != nil {
-			return fmt.Errorf("writing private key to %s: %w", keypath, err)
-		}
-	} else {
-		pw, err := getPassword()
-		if err != nil {
-			return fmt.Errorf("getting password: %w", err)
-		}
-		log.Infof("writing encrypted private key to: %s...\n", keypath)
-		err = fccrypto.WritePasswordEncryptedKey(keypath, priv, pw)
-		if err != nil {
-			return fmt.Errorf("writing encrypted private key to %s: %w", keypath, err)
-		}
-	}
-
 	csrResourceJSON, err := createCsr(o, name, priv)
 	if err != nil {
 		return fmt.Errorf("creating csr resource: %w", err)
@@ -165,6 +144,30 @@ func (o *CertificateOptions) Run(ctx context.Context, args []string) error {
 		return fmt.Errorf("submitting csr to flightctl service: %w", err)
 	}
 	log.Infof("%s: %s\n", status, name)
+	if status == "201 Created" {
+		log.Infof("new CSR was created with generated key pair\n")
+		// if the CSR did not already exist, a new one was created with the generated
+		// key pair. write out the key asap in case the process is interrupted, as the
+		// key may be needed to retrieve the certificate.
+		keypath := o.OutputDir + name + ".key"
+		if !o.EncryptKey {
+			log.Infof("writing private key to: %s...\n", keypath)
+			err = fccrypto.WriteKey(keypath, priv)
+			if err != nil {
+				return fmt.Errorf("writing private key to %s: %w", keypath, err)
+			}
+		} else {
+			pw, err := getPassword()
+			if err != nil {
+				return fmt.Errorf("getting password: %w", err)
+			}
+			log.Infof("writing encrypted private key to: %s...\n", keypath)
+			err = fccrypto.WritePasswordEncryptedKey(keypath, priv, pw)
+			if err != nil {
+				return fmt.Errorf("writing encrypted private key to %s: %w", keypath, err)
+			}
+		}
+	}
 
 	// if this isn't an enrollment cert, approval may take arbitrary time, so don't poll for
 	// the cert here - we're done!
