@@ -16,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/ccoveille/go-safecast"
 	api "github.com/flightctl/flightctl/api/v1alpha1"
@@ -29,7 +28,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/yaml"
 )
 
@@ -174,18 +172,6 @@ func (o *CertificateOptions) Run(ctx context.Context, args []string) error {
 		return nil
 	}
 
-	err = wait.PollWithContext(ctx, time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
-		log.Infof("checking for certificate...")
-		currentCsr, err := getCsr(o, name, c, ctx)
-		if err != nil {
-			return false, fmt.Errorf("reading csr: %s: %w", ctx.Value("name"), err)
-		}
-		return checkCsrCertReady(currentCsr), nil
-	})
-	if err != nil {
-		return fmt.Errorf("polling for certificate: %w", err)
-	}
-	log.Infof("certificate is ready")
 	currentCsr, err := getCsr(o, name, c, ctx)
 	if err != nil {
 		return fmt.Errorf("reading csr %s: %w", name, err)
@@ -396,15 +382,6 @@ func createUniqueName(n string) string {
 		n = n + "-" + u[:8]
 	}
 	return n
-}
-
-func checkCsrCertReady(csr *api.CertificateSigningRequest) bool {
-	if csr.Status == nil {
-		return false
-	} else if csr.Status.Certificate == nil {
-		return false
-	}
-	return true
 }
 
 // credit: modified from
