@@ -77,6 +77,17 @@ const (
 	DeviceLifecycleHookBeforeUpdating  DeviceLifecycleHookType = "BeforeUpdating"
 )
 
+// Defines values for DeviceLifecycleStatusType.
+const (
+	DeviceLifecycleStatusDecommissioned           DeviceLifecycleStatusType = "Decommissioned"
+	DeviceLifecycleStatusDecommissioningError     DeviceLifecycleStatusType = "DecommissionError"
+	DeviceLifecycleStatusDecommissioningRequested DeviceLifecycleStatusType = "DecommissioningRequested"
+	DeviceLifecycleStatusDecommissioningStarted   DeviceLifecycleStatusType = "DecommissioningStarted"
+	DeviceLifecycleStatusDecommissioningTimeout   DeviceLifecycleStatusType = "DecommissionTimeout"
+	DeviceLifecycleStatusEnrolled                 DeviceLifecycleStatusType = "Enrolled"
+	DeviceLifecycleStatusUnknown                  DeviceLifecycleStatusType = "Unknown"
+)
+
 // Defines values for DeviceResourceStatusType.
 const (
 	DeviceResourceStatusCritical DeviceResourceStatusType = "Critical"
@@ -408,6 +419,16 @@ type DeviceIntegrityStatusSummaryType string
 // DeviceLifecycleHookType defines model for DeviceLifecycleHookType.
 type DeviceLifecycleHookType string
 
+// DeviceLifecycleStatus Current status of the lifecycle of the device.
+type DeviceLifecycleStatus struct {
+	// Info Human readable information about the device lifecycle status.
+	Info   *string                   `json:"info,omitempty"`
+	Status DeviceLifecycleStatusType `json:"status"`
+}
+
+// DeviceLifecycleStatusType defines model for DeviceLifecycleStatusType.
+type DeviceLifecycleStatusType string
+
 // DeviceList DeviceList is a list of Devices.
 type DeviceList struct {
 	// ApiVersion APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
@@ -499,6 +520,9 @@ type DeviceStatus struct {
 
 	// LastSeen The last time the device was seen by the service.
 	LastSeen time.Time `json:"lastSeen"`
+
+	// Lifecycle Current status of the lifecycle of the device.
+	Lifecycle DeviceLifecycleStatus `json:"lifecycle"`
 
 	// Os Current status of the device OS.
 	Os DeviceOSStatus `json:"os"`
