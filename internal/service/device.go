@@ -418,5 +418,27 @@ func (h *ServiceHandler) DecommissionDevice(ctx context.Context, request server.
 	if !allowed {
 		return server.DecommissionDevice403JSONResponse{Message: Forbidden}, nil
 	}
-	return nil, fmt.Errorf("not yet implemented")
+	orgId := store.NullOrgId
+
+	var updateCallback func(before *model.Device, after *model.Device)
+	if h.callbackManager != nil {
+		updateCallback = h.callbackManager.DeviceUpdatedCallback
+	}
+
+	newObj := &v1alpha1.Device{}
+
+	// remove device from fleet
+	newObj.Metadata.Owner = nil
+
+	// set device lifecycle
+	newObj.Status.Lifecycle = v1alpha1.DeviceLifecycleStatus{Status: "Decommissioning"}
+
+	result, err := h.store.Device().Update(ctx, orgId, newObj, nil, true, updateCallback)
+
+	switch err {
+	case nil:
+		return server.DecommissionDevice200JSONResponse(*result), nil
+	default:
+		return nil, err
+	}
 }
