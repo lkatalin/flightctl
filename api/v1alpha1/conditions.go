@@ -102,6 +102,17 @@ func FindStatusCondition(conditions []Condition, conditionType ConditionType) *C
 	return nil
 }
 
+// FindStatusConditionWithReason finds the conditionType with Reason in conditions.
+func FindStatusConditionWithReason(conditions []Condition, conditionType ConditionType, reason string) *Condition {
+	for i := range conditions {
+		if conditions[i].Type == conditionType && conditions[i].Reason == reason {
+			return &conditions[i]
+		}
+	}
+
+	return nil
+}
+
 // IsStatusConditionTrue returns true when the conditionType is present and set to `ConditionTrue`
 func IsStatusConditionTrue(conditions []Condition, conditionType ConditionType) bool {
 	return IsStatusConditionPresentAndEqual(conditions, conditionType, ConditionStatusTrue)

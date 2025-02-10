@@ -94,3 +94,48 @@ func (d *Device) IsDecommissioning() bool {
 	}
 	return decommissioningCondition.Status == ConditionStatusTrue
 }
+
+// StartedDecommissioning() is true if the device has added a DeviceDecommissioning ConditionType to its Conditions with Reason "DecommissionStateStarted".
+func (d *Device) StartedDecommissioning() bool {
+	if d.Status == nil || d.Status.Conditions == nil {
+		return false
+	}
+
+	decommissioningCondition := FindStatusConditionWithReason(d.Status.Conditions, DeviceDecommissioning, string(DecommissionStateStarted))
+	if decommissioningCondition == nil {
+		return false
+	}
+
+	return decommissioningCondition.Status == ConditionStatusTrue
+
+}
+
+// CompletedDecommissioning() is true if the device has added a DeviceDecommissioning ConditionType to its Conditions with Reason "DecommissionStateCompleted".
+func (d *Device) CompletedDecommissioning() bool {
+	if d.Status == nil || d.Status.Conditions == nil {
+		return false
+	}
+
+	decommissioningCondition := FindStatusConditionWithReason(d.Status.Conditions, DeviceDecommissioning, string(DecommissionStateComplete))
+	if decommissioningCondition == nil {
+		return false
+	}
+
+	return decommissioningCondition.Status == ConditionStatusTrue
+
+}
+
+// ErroredDecommissioning() is true if the device has added a DeviceDecommissioning ConditionType to its Conditions with Reason "DecommissionStateError".
+func (d *Device) ErroredDecommissioning() bool {
+	if d.Status == nil || d.Status.Conditions == nil {
+		return false
+	}
+
+	decommissioningCondition := FindStatusConditionWithReason(d.Status.Conditions, DeviceDecommissioning, string(DecommissionStateError))
+	if decommissioningCondition == nil {
+		return false
+	}
+
+	return decommissioningCondition.Status == ConditionStatusTrue
+
+}
