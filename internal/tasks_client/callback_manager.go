@@ -200,7 +200,10 @@ func (t *callbackManager) DeviceUpdatedNoRenderCallback(orgId uuid.UUID, before 
 func (t *callbackManager) DeviceUpdatedCallback(orgId uuid.UUID, before *api.Device, after *api.Device) {
 	t.DeviceUpdatedNoRenderCallback(orgId, before, after)
 	if after != nil && (before == nil || !api.DeviceSpecsAreEqual(*before.Spec, *after.Spec)) {
+		t.log.Infof("\n\nDevice specs were not equal - calling device source updated\n\n")
 		t.DeviceSourceUpdated(orgId, lo.FromPtr(after.Metadata.Name))
+	} else {
+		t.log.Infof("\n\nDevice specs were equal\n\n")
 	}
 }
 
