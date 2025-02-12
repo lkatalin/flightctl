@@ -234,14 +234,6 @@ The following state diagram shows the possible transitions between lifecycle sta
 
 ```mermaid
 stateDiagram
-    classDef transientNotReported stroke-dasharray:5 5
-    class ActivatingConfig transientNotReported
-
-    classDef notYetSupported fill:white
-    class PoweringOff notYetSupported
-    class PoweredOff notYetSupported
-    class PoweringOn notYetSupported
-
     direction LR
 
     Unknown
