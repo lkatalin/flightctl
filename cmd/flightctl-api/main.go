@@ -106,7 +106,11 @@ func main() {
 	}
 
 	// also write out a client config file
-	err = client.WriteConfig(config.ClientConfigFile(), cfg.Service.BaseUrl, "", ca.Config, nil)
+	caPemBytes, err := ca.GetCABundle()
+	if err != nil {
+		log.Fatalf("loading CA certificate bundle: %v", err)
+	}
+	err = client.WriteConfig(config.ClientConfigFile(), cfg.Service.BaseUrl, "", caPemBytes, nil)
 	if err != nil {
 		log.Fatalf("writing client config: %v", err)
 	}
