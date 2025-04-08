@@ -5,11 +5,12 @@ import (
 	"crypto/sha1"
         "testing"
 
-        "github.com/google/go-tpm/tpmutil"
-	"github.com/google/go-tpm/legacy/tpm2"
+	//"github.com/google/go-tpm/tpmutil"
+	//"github.com/google/go-tpm/legacy/tpm2"
+	"github.com/google/go-tpm/tpm"
 )
 
-func getAuth(name string) tpm2.Digest {
+func getAuth(name string) tpm.Digest {
         var auth Digest
         authInput := os.Getenv(name)
         if authInput != "" {
@@ -31,7 +32,7 @@ func TestQuote(t *testing.T) {
         // use default auth of zeroes
         auth := getAuth("")
 
-        handle, err := LoadKey2(tpm, key, auth[:])
+        handle, err := tpm.LoadKey2(tpm, key, auth[:])
         if err != nil {
                 t.Fatal("Could not get tpm handle")
         }
