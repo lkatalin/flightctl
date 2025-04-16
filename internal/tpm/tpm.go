@@ -64,6 +64,7 @@ func (t *TPM) GetPCRValues(measurements map[string]string) error {
 // SensitiveDataOrigin: yes (was created in the TPM)
 func (t *TPM) CreateLAK() (*client.Key, error) {
 	// AttestationKeyECC generates and loads a key from AKTemplateECC in the Owner hierarchy.
+	// TODO - shouldn't this be in the Storage hierarchy because it's a local key?
 	lak, err := client.AttestationKeyECC(t.channel)
 	if err != nil {
 		return nil, err
@@ -80,9 +81,35 @@ func (t *TPM) CreateLAK() (*client.Key, error) {
 // SensitiveDataOrigin: yes (was created in the TPM)
 func (t *TPM) CreateLDevID() (*client.Key, error) {
 	return nil, fmt.Errorf("todo")
+
+	// handle is supposed to be a uint32 but it's unclear in tpmutil how you get this value
+	// 'type Handle is a reference to a TPM object'
+	//h := handle.HandleValue()
+
+	// type Public frpm tpm2 looks like this:
+	/* type Public struct {
+	Type       Algorithm
+	NameAlg    Algorithm
+	Attributes KeyProp
+	AuthPolicy tpmutil.U16Bytes
+
+	// RSAParameters contains both [rsa]parameters and [rsa]unique.
+	RSAParameters *RSAParams
+	// ECCParameters contains both [ecc]parameters and [ecc]unique.
+	ECCParameters *ECCParams
+	// SymCipherParameters contains both [sym]parameters and [sym]unique.
+	SymCipherParameters *SymCipherParams
+	// KeyedHashParameters contains both [keyedHash]parameters and [keyedHash]unique.
+	KeyedHashParameters *KeyedHashParams
+	}*/
+
+	//ldevid, err := client.NewKey(t.channel, parent tpmutil.Handle, template tpm2.Public)
 }
 
 func (t *TPM) GetAttestation(nonce []byte, ak client.Key) (*pbattest.Attestation, error) {
+	// todo - may want to use CertChainFetcher in the AttestOpts in the future
+	// see https://pkg.go.dev/github.com/google/go-tpm-tools/client#AttestOpts
+
 	att, err := ak.Attest(client.AttestOpts{Nonce: nonce})
 	if err != nil {
 		return nil, err
@@ -90,13 +117,11 @@ func (t *TPM) GetAttestation(nonce []byte, ak client.Key) (*pbattest.Attestation
 	return att, nil
 }
 
-//todo - make sure nonce is only of len 8 - or can it be longer? - seems like 8 bytes is minimum for security
-func (t *TPM) GetQuote(nonce []byte, ak client.Key, pcr_selection tpm2.PCRSelection) (*pbtpm.Quote, error) {
+//todo - make sure nonce is >= 8 bytes
+func (t *TPM) GetQuote(nonce []byte, ak *client.Key, pcr_selection tpm2.PCRSelection) (*pbtpm.Quote, error) {
 	quote, err := ak.Quote(pcr_selection, nonce)
         if err != nil {
                 return nil, err
         }
 	return quote, nil
 }
-
-
