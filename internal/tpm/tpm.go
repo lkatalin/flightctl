@@ -106,7 +106,7 @@ func (t *TPM) CreateLDevID() (*client.Key, error) {
 	//ldevid, err := client.NewKey(t.channel, parent tpmutil.Handle, template tpm2.Public)
 }
 
-func (t *TPM) GetAttestation(nonce []byte, ak client.Key) (*pbattest.Attestation, error) {
+func (t *TPM) GetAttestation(nonce []byte, ak *client.Key) (*pbattest.Attestation, error) {
 	// todo - may want to use CertChainFetcher in the AttestOpts in the future
 	// see https://pkg.go.dev/github.com/google/go-tpm-tools/client#AttestOpts
 
@@ -118,8 +118,8 @@ func (t *TPM) GetAttestation(nonce []byte, ak client.Key) (*pbattest.Attestation
 }
 
 //todo - make sure nonce is >= 8 bytes
-func (t *TPM) GetQuote(nonce []byte, ak *client.Key, pcr_selection tpm2.PCRSelection) (*pbtpm.Quote, error) {
-	quote, err := ak.Quote(pcr_selection, nonce)
+func (t *TPM) GetQuote(nonce []byte, ak *client.Key, pcr_selection *tpm2.PCRSelection) (*pbtpm.Quote, error) {
+	quote, err := ak.Quote(*pcr_selection, nonce)
         if err != nil {
                 return nil, err
         }
