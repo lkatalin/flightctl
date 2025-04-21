@@ -2,11 +2,11 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"time"
 
 	"github.com/flightctl/flightctl/internal/agent/device/fileio"
@@ -82,36 +82,38 @@ type Config struct {
 	// DefaultLabels are automatically applied to this device when the agent is enrolled in a service
 	DefaultLabels map[string]string `json:"default-labels,omitempty"`
 
-	// SystemInfoKeys optionally replaces the default set of system info keys
-	// collected and exposed by the agent. If unset, system.DefaultInfoKeys is used.
-	SystemInfoKeys []string `json:"system-info-keys,omitempty"`
+	// SystemInfoDetails contains keys for collecting system information.
+	// There are two types of keys:
+	// 1. Built-in keys that have internal implementations for collection
+	// 2. Custom keys that require an executable script
+	//
+	// For any key in this list:
+	// - If an executable with the same name as the key exists in datadir/details.d,
+	//   it will be used (overriding any internal implementation if present)
+	// - If no executable exists and the key is built-in, the internal
+	//   implementation will be used
+	// - If no executable exists and the key is not built-in, the key will
+	//   have an empty value
+	SystemInfoDetails []string `json:"system-info-details,omitempty"`
 
-	// CustomSystemInfoKeys are user-defined keys that can be used to collect
-	// additional information. The expectation is that an executable with the
-	// same name as the key exists in the system path. The output of the
-	// executable will be collected and added to the systemInfo status. If the
-	// script returns a non-zero exit code or does not exist, the key will have
-	// an empty value.
-	CustomSystemInfoKeys []string `json:"custom-system-info,omitempty"`
-
-	// CollectSystemInfoTimeout is the timeout for collecting system info.
-	CollectSystemInfoTimeout util.Duration `json:"collect-info-timeout,omitempty"`
+	// SystemInfoTimeout is the timeout for collecting system info.
+	SystemInfoTimeout util.Duration `json:"collect-info-timeout,omitempty"`
 
 	readWriter fileio.ReadWriter
 }
 
 func NewDefault() *Config {
 	c := &Config{
-		ConfigDir:                DefaultConfigDir,
-		DataDir:                  DefaultDataDir,
-		StatusUpdateInterval:     DefaultStatusUpdateInterval,
-		SpecFetchInterval:        DefaultSpecFetchInterval,
-		readWriter:               fileio.NewReadWriter(),
-		LogLevel:                 logrus.InfoLevel.String(),
-		DefaultLabels:            make(map[string]string),
-		ServiceConfig:            config.NewServiceConfig(),
-		SystemInfoKeys:           systeminfo.DefaultInfoKeys,
-		CollectSystemInfoTimeout: DefaultSystemInfoTimeout,
+		ConfigDir:            DefaultConfigDir,
+		DataDir:              DefaultDataDir,
+		StatusUpdateInterval: DefaultStatusUpdateInterval,
+		SpecFetchInterval:    DefaultSpecFetchInterval,
+		readWriter:           fileio.NewReadWriter(),
+		LogLevel:             logrus.InfoLevel.String(),
+		DefaultLabels:        make(map[string]string),
+		ServiceConfig:        config.NewServiceConfig(),
+		SystemInfoDetails:    systeminfo.DefaultDetailsKeys,
+		SystemInfoTimeout:    DefaultSystemInfoTimeout,
 	}
 
 	if value := os.Getenv(TestRootDirEnvKey); value != "" {
@@ -182,7 +184,8 @@ func (cfg *Config) Validate() error {
 		return err
 	}
 	if err := cfg.validateSystemInfoKeys(); err != nil {
-		return err
+		// best effort validation
+		klog.Warningf("system info details validation: %v", err)
 	}
 
 	requiredFields := []struct {
@@ -192,7 +195,7 @@ func (cfg *Config) Validate() error {
 	}{
 		{cfg.ConfigDir, "config-dir", true},
 		{cfg.DataDir, "data-dir", true},
-		{filepath.Join(cfg.DataDir, systeminfo.ScriptOverrideDir), "system-info-override-dir", true},
+		{filepath.Join(cfg.DataDir, systeminfo.PluginDir), "system-info-plugin-dir", true},
 	}
 
 	for _, field := range requiredFields {
@@ -239,30 +242,6 @@ func (cfg *Config) String() string {
 	return string(contents)
 }
 
-func (cfg *Config) MergedInfoKeys() []string {
-	keySet := make(map[string]struct{})
-
-	keys := cfg.SystemInfoKeys
-	if len(keys) == 0 {
-		keys = systeminfo.DefaultInfoKeys
-	}
-	for _, k := range keys {
-		keySet[k] = struct{}{}
-	}
-
-	// custom script-based keys
-	for _, k := range cfg.CustomSystemInfoKeys {
-		keySet[k] = struct{}{}
-	}
-
-	merged := make([]string, 0, len(keySet))
-	for k := range keySet {
-		merged = append(merged, k)
-	}
-	sort.Strings(merged)
-	return merged
-}
-
 func (cfg *Config) validateSyncIntervals() error {
 	if cfg.SpecFetchInterval < MinSyncInterval {
 		return fmt.Errorf("minimum spec fetch interval is %s have %s", MinSyncInterval, cfg.SpecFetchInterval)
@@ -274,22 +253,23 @@ func (cfg *Config) validateSyncIntervals() error {
 }
 
 func (cfg *Config) validateSystemInfoKeys() error {
-	for _, key := range cfg.SystemInfoKeys {
-		if _, ok := systeminfo.SupportedInfoKeys[key]; !ok {
-			return fmt.Errorf("unsupported system-info-key: %q", key)
+	var errs []error
+	for _, key := range cfg.SystemInfoDetails {
+		_, internal := systeminfo.SupportedInfoKeys[key]
+		scriptPath := filepath.Join(cfg.DataDir, systeminfo.PluginDir, key)
+		exists, err := cfg.readWriter.PathExists(scriptPath)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("checking if system info details script exists %q: %w", key, err))
+			continue
+		}
+		if !exists && !internal {
+			errs = append(errs, fmt.Errorf("system info details script %q does not exist", key))
 		}
 	}
 
-	// custom info key validation is best effort
-	for _, key := range cfg.CustomSystemInfoKeys {
-		scriptPath := filepath.Join(cfg.DataDir, systeminfo.ScriptOverrideDir, key)
-		exists, err := cfg.readWriter.PathExists(scriptPath)
-		if err != nil {
-			klog.Errorf("Checking custom info key %q: %v", key, err)
-		}
-		if !exists {
-			klog.Errorf("Custom info key collector %q does not exist: %s", key, scriptPath)
-		}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
+
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 const (
 	sysVirtualNetDir = "/sys/devices/virtual/net"
 	sysClassNetDir   = "/sys/class/net"
-	dmiDirClass      = "/sys/class/dmi/id"
+	dmiClassPath     = "/sys/class/dmi/id"
 	pciDevicesPath   = "/sys/bus/pci/devices"
 	osReleasePath    = "/etc/os-release"
 	resolveConfPath  = "/etc/resolv.conf"
@@ -28,9 +29,14 @@ const (
 	memInfoPath      = "/proc/meminfo"
 	ipv4RoutePath    = "/proc/net/route"
 	ipv6RoutePath    = "/proc/net/ipv6_route"
+	bootIDPath       = "/proc/sys/kernel/random/boot_id"
 
-	// ScriptOverrideDir is the directory where custom/overide scripts are stored
-	ScriptOverrideDir = "collect.d"
+	// PluginDir is the directory where custom/overide scripts are stored in the data-dir.
+	PluginDir = "system-info"
+	// SystemFileName is the name of the file where the system boot status is stored in the data-dir.
+	SystemFileName = "system.json"
+	// HardwareMapFileName is the name of the file where the hardware map is stored.
+	HardwareMapFileName = "hardware-map.json"
 )
 
 type Manager interface {
@@ -41,19 +47,26 @@ type Manager interface {
 	// BootTime returns the time the system was booted
 	BootTime() string
 	// ReloadStatus collects system info and sends a patch status to the management API
-	ReloadStatus() error
+	ReloadStatus(ctx context.Context) error
+	// RegisterCollector registers a system info collector
+	RegisterCollector(ctx context.Context, name string, fn CollectorFn)
 	status.Exporter
 }
 
+// CollectorFn is a function that collects system information. Collectors are
+// best effort and should log any errors.
+type CollectorFn func(ctx context.Context) string
+
 type Info struct {
-	Hostname     string                 `json:"hostname"`
-	Architecture string                 `json:"architecture"`
-	Kernel       string                 `json:"kernel"`
-	Distribution map[string]interface{} `json:"distribution,omitempty"`
-	Hardware     HardwareFacts          `json:"hardware"`
-	CollectedAt  string                 `json:"collected_at"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
-	Boot         Boot                   `json:"boot,omitempty"`
+	Hostname        string                 `json:"hostname"`
+	Architecture    string                 `json:"architecture"`
+	OperatingSystem string                 `json:"operating_system"`
+	Kernel          string                 `json:"kernel"`
+	Distribution    map[string]interface{} `json:"distribution,omitempty"`
+	Hardware        HardwareFacts          `json:"hardware"`
+	CollectedAt     string                 `json:"collected_at"`
+	Metadata        map[string]interface{} `json:"metadata,omitempty"`
+	Boot            Boot                   `json:"boot,omitempty"`
 }
 
 // HardwareFacts contains hardware information gathered by ghw
@@ -238,8 +251,9 @@ func CollectInfo(ctx context.Context, log *log.PrefixLogger, exec executer.Execu
 	if err != nil {
 		log.Warningf("Failed to get hostname: %v", err)
 	}
-
+	info.OperatingSystem = runtime.GOOS
 	info.Architecture = runtime.GOARCH
+
 	if out, err := exec.CommandContext(ctx, "uname", "-r").Output(); err == nil {
 		info.Kernel = strings.TrimSpace(string(out))
 	} else {
@@ -463,10 +477,9 @@ var SupportedInfoKeys = map[string]func(info *Info) string{
 	},
 }
 
-// DefaultInfoKeys is a list of default keys to be used when generating facts
-var DefaultInfoKeys = []string{
+// DefaultDetailsKeys is a list of default keys to be used when generating facts
+var DefaultDetailsKeys = []string{
 	"hostname",
-	"architecture",
 	"kernel",
 	"distro_name",
 	"distro_version",
@@ -477,23 +490,30 @@ var DefaultInfoKeys = []string{
 	"default_mac_address",
 }
 
-// GenerateFacts generates a map of facts based on the provided keys and system information
-func GenerateFacts(ctx context.Context, log *log.PrefixLogger, reader fileio.Reader, exec executer.Executer, info *Info, keys []string, dataDir string) map[string]string {
+// GenerateDetails generates a map of systemInfo details based on the provided keys
+func GenerateDetails(ctx context.Context, log *log.PrefixLogger, reader fileio.Reader, exec executer.Executer, info *Info, detailKeys []string, dataDir string) map[string]string {
 	labels := make(map[string]string)
 
-	for _, key := range keys {
+	for _, key := range detailKeys {
 		if ctx.Err() != nil {
 			log.Warningf("Context error while generating facts for key %s: %v", key, ctx.Err())
 			return labels
 		}
-		// eval override/custom
+
+		// check if detail key has internal implementation
+		internalFn, isInternal := SupportedInfoKeys[key]
+
+		// check for override value
 		if val, ok := getOverrideValue(ctx, key, reader, exec, dataDir); ok {
+			if isInternal {
+				log.Infof("SystemInfo detail key %q was overridden by custom executable", key)
+			}
 			labels[key] = val
 			continue
 		}
 
-		if fn, ok := SupportedInfoKeys[key]; ok {
-			val := fn(info)
+		if isInternal {
+			val := internalFn(info)
 			if val != "" {
 				labels[key] = val
 			}
@@ -503,21 +523,61 @@ func GenerateFacts(ctx context.Context, log *log.PrefixLogger, reader fileio.Rea
 	return labels
 }
 
-// getOverrideValue checks if a script exists in the override directory and executes it
+// getOverrideValue checks if a script exists in the override directory and executes it.
+//
+// It supports multiple filename patterns based on a hostname:
+//   - hostname
+//   - hostname.sh
+//   - 01-hostname.sh
+//   - 20-hostname.pyp
 func getOverrideValue(ctx context.Context, key string, reader fileio.Reader, exec executer.Executer, dataDir string) (string, bool) {
-	scriptPath := filepath.Join(dataDir, ScriptOverrideDir, key)
-	info, err := os.Stat(reader.PathFor(scriptPath))
-	if err != nil || info.IsDir() {
-		return "", false
-	}
-
-	// TODO do we need to have a timeout for each we do have a global timeout.
-	out, err := exec.CommandContext(ctx, reader.PathFor(scriptPath)).Output()
+	dir := filepath.Join(dataDir, PluginDir)
+	entries, err := os.ReadDir(reader.PathFor(dir))
 	if err != nil {
 		return "", false
 	}
 
-	return strings.TrimSpace(string(out)), true
+	var candidates []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+		base := strings.TrimSuffix(name, filepath.Ext(name))
+
+		// match exact key or prefix + "-" + key
+		// intentionally not using regex to avoid performance cost
+		if base == key || strings.HasSuffix(base, "-"+key) {
+			candidates = append(candidates, name)
+		}
+	}
+
+	if len(candidates) == 0 {
+		return "", false
+	}
+
+	// lexicographically sort the candidates
+	sort.Strings(candidates)
+
+	for _, name := range candidates {
+		scriptPath := filepath.Join(dir, name)
+		fullPath := reader.PathFor(scriptPath)
+
+		info, err := os.Stat(fullPath)
+		if err != nil || info.IsDir() || info.Mode()&0111 == 0 {
+			continue
+		}
+
+		out, err := exec.CommandContext(ctx, fullPath).Output()
+		if err != nil {
+			return "", false
+		}
+
+		return strings.TrimSpace(string(out)), true
+	}
+
+	return "", false
 }
 
 // collectSystemInfo gathers system information
@@ -535,7 +595,7 @@ func collectSystemInfo(reader fileio.Reader) (*SystemInfo, error) {
 	}
 
 	for fileName, fieldPtr := range fileFieldMap {
-		filePath := filepath.Join(dmiDirClass, fileName)
+		filePath := filepath.Join(dmiClassPath, fileName)
 		content, err := reader.ReadFile(filePath)
 		if err == nil {
 			*fieldPtr = strings.TrimSpace(string(content))
@@ -612,7 +672,7 @@ func collectBIOSInfo(reader fileio.Reader) (*BIOSInfo, error) {
 	}
 
 	for fileName, fieldPtr := range fileFieldMap {
-		filePath := filepath.Join(dmiDirClass, fileName)
+		filePath := filepath.Join(dmiClassPath, fileName)
 		content, err := reader.ReadFile(filePath)
 		if err != nil {
 			// best effort: ignore errors for missing files and permissions

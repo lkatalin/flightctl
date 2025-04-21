@@ -3,6 +3,7 @@ package systeminfo
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -31,7 +32,7 @@ func TestManager(t *testing.T) {
 
 	// set mock boot_id
 	mockBootID := "c4070599-f0f0-472d-8084-09b7274ebf18"
-	err = readWriter.WriteFile(DefaultBootIDPath, []byte(mockBootID), 0644)
+	err = readWriter.WriteFile(bootIDPath, []byte(mockBootID), 0644)
 	require.NoError(err)
 
 	ctrl := gomock.NewController(t)
@@ -59,7 +60,7 @@ func TestManager(t *testing.T) {
 	}
 	mockStatusBytes, err := json.Marshal(mockStatus)
 	require.NoError(err)
-	err = readWriter.WriteFile(filepath.Join(dataDir, SystemBootFileName), mockStatusBytes, 0644)
+	err = readWriter.WriteFile(filepath.Join(dataDir, SystemFileName), mockStatusBytes, 0644)
 	require.NoError(err)
 
 	// reinitialize client
@@ -90,4 +91,165 @@ func BenchmarkCollectInfo(b *testing.B) {
 			b.Fatal("Expected non-nil info")
 		}
 	}
+}
+
+func TestGenerateDetails(t *testing.T) {
+	require := require.New(t)
+	// Define test cases
+	tests := []struct {
+		name           string
+		key            string
+		keys           []string
+		info           Info
+		scripContent   []byte
+		scriptName     string
+		expectedValue  string
+		expectedExists bool
+	}{
+		{
+			name:         "override hostname exit 0",
+			key:          "hostname",
+			scriptName:   "hostname",
+			scripContent: generateScriptBytes(0, "hostname_test", 0),
+			info: Info{
+				Hostname: "test-host",
+			},
+			keys:           []string{"hostname"},
+			expectedValue:  "hostname_test",
+			expectedExists: true,
+		},
+		{
+			name:         "override hostname exit 0 timeout",
+			key:          "hostname",
+			scriptName:   "hostname",
+			scripContent: generateScriptBytes(200, "hostname_test", 0),
+			info: Info{
+				Hostname: "test-host",
+			},
+			keys:           []string{"hostname"},
+			expectedValue:  "test-host",
+			expectedExists: true,
+		},
+		{
+			name:         "override hostname with script extension exit 0",
+			key:          "hostname",
+			scriptName:   "hostname.sh",
+			scripContent: generateScriptBytes(0, "hostname_test", 0),
+			info: Info{
+				Hostname: "test-host",
+			},
+			keys:           []string{"hostname"},
+			expectedValue:  "hostname_test",
+			expectedExists: true,
+		},
+		{
+			name:         "override hostname with script prefix exit 0",
+			key:          "hostname",
+			scriptName:   "01-hostname",
+			scripContent: generateScriptBytes(0, "hostname_test", 0),
+			info: Info{
+				Hostname: "test-host",
+			},
+			keys:           []string{"hostname"},
+			expectedValue:  "hostname_test",
+			expectedExists: true,
+		},
+		{
+			name:         "override hostname with script prefix and suffix exit 0",
+			key:          "hostname",
+			scriptName:   "01-hostname.sh",
+			scripContent: generateScriptBytes(0, "hostname_test", 0),
+			info: Info{
+				Hostname: "test-host",
+			},
+			keys:           []string{"hostname"},
+			expectedValue:  "hostname_test",
+			expectedExists: true,
+		},
+		{
+			name:         "override hostname with invalid script name",
+			key:          "hostname",
+			scriptName:   "01-hostname_custom.sh",
+			scripContent: generateScriptBytes(0, "hostname_test", 0),
+			info: Info{
+				Hostname: "test-host",
+			},
+			keys:           []string{"hostname"},
+			expectedValue:  "test-host",
+			expectedExists: true,
+		},
+		{
+			name:         "override hostname exit 1",
+			key:          "hostname",
+			scriptName:   "hostname",
+			scripContent: generateScriptBytes(0, "hostname_test", 1),
+			info: Info{
+				Hostname: "test-host",
+			},
+			keys:           []string{"hostname"},
+			expectedValue:  "test-host",
+			expectedExists: true,
+		},
+		{
+			name:           "empty info override hostname",
+			info:           Info{},
+			key:            "hostname",
+			scriptName:     "hostname",
+			scripContent:   generateScriptBytes(0, "hostname_test", 0),
+			keys:           []string{"hostname"},
+			expectedValue:  "hostname_test",
+			expectedExists: true,
+		},
+		{
+			name: "undefined custom key",
+			info: Info{
+				Hostname: "test-host",
+			},
+			key:            "custom_key",
+			scriptName:     "custom_key",
+			scripContent:   generateScriptBytes(0, "custom_value", 0),
+			keys:           []string{"hostname"},
+			expectedValue:  "",
+			expectedExists: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			tmpDir := t.TempDir()
+			dataDir := filepath.Join(tmpDir, "var", "lib", "flightctl")
+
+			rw := fileio.NewReadWriter()
+			rw.SetRootdir(tmpDir)
+			overrideDir := filepath.Join(dataDir, PluginDir)
+			err := rw.MkdirAll(overrideDir, fileio.DefaultDirectoryPermissions)
+			require.NoError(err)
+			scriptFile := filepath.Join(overrideDir, tt.scriptName)
+
+			err = rw.WriteFile(scriptFile, tt.scripContent, fileio.DefaultExecutablePermissions)
+			require.NoError(err)
+			log := log.NewPrefixLogger("test")
+			exec := &executer.CommonExecuter{}
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+
+			details := GenerateDetails(ctx, log, rw, exec, &tt.info, tt.keys, dataDir)
+			require.NotEmpty(details)
+			value, exists := details[tt.key]
+			require.Equal(tt.expectedExists, exists)
+			require.Equal(tt.expectedValue, value)
+		})
+	}
+}
+
+func generateScriptBytes(sleepms int, output string, exitCode int) []byte {
+	var sleepCmd string
+	if sleepms > 0 {
+		// generate sleep
+		sleepCmd = fmt.Sprintf("sleep 0.%03d\n", sleepms)
+	}
+
+	content := fmt.Sprintf("#!/bin/bash\n%secho '%s'\nexit %d", sleepCmd, output, exitCode)
+	return []byte(content)
 }

@@ -123,8 +123,8 @@ func (a *Agent) Run(ctx context.Context) error {
 		executer,
 		deviceReadWriter,
 		a.config.DataDir,
-		a.config.MergedInfoKeys(),
-		a.config.CollectSystemInfoTimeout,
+		a.config.SystemInfoDetails,
+		a.config.SystemInfoTimeout,
 	)
 	if err := systemInfoManager.Initialize(); err != nil {
 		return err
@@ -202,6 +202,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	statusManager.RegisterStatusExporter(osManager)
 	statusManager.RegisterStatusExporter(specManager)
 	statusManager.RegisterStatusExporter(systemInfoManager)
+
+	// register internal system info collectors
+	// systemInfoManager.RegisterCollector(ctx, "attestation", lifecycleManager.GetAttestation)
 
 	// create config controller
 	configController := config.NewController(
