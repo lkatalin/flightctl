@@ -37,6 +37,7 @@ type LifecycleManager struct {
 	deviceReadWriter     fileio.ReadWriter
 
 	enrollmentClient client.Enrollment
+	tpmClient        *TpmClient
 	defaultLabels    map[string]string
 	enrollmentCSR    []byte
 	statusManager    status.Manager
@@ -54,6 +55,7 @@ func NewManager(
 	managementKeyPath string,
 	deviceReadWriter fileio.ReadWriter,
 	enrollmentClient client.Enrollment,
+	tpmClient *TpmClient,
 	enrollmentCSR []byte,
 	defaultLabels map[string]string,
 	statusManager status.Manager,
@@ -69,6 +71,7 @@ func NewManager(
 		managementKeyPath:    managementKeyPath,
 		deviceReadWriter:     deviceReadWriter,
 		enrollmentClient:     enrollmentClient,
+		tpmClient:            tpmClient,
 		enrollmentCSR:        enrollmentCSR,
 		defaultLabels:        defaultLabels,
 		backoff:              backoff,
