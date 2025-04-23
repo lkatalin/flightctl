@@ -76,6 +76,15 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.config.ManagementService.Config.AuthInfo.ClientCertificate = filepath.Join(a.config.DataDir, agent_config.DefaultCertsDirName, agent_config.GeneratedCertFile)
 		a.config.ManagementService.Config.AuthInfo.ClientKey = filepath.Join(a.config.DataDir, agent_config.DefaultCertsDirName, agent_config.KeyFile)
 	}
+
+	// create tpm client
+	tpmClient, err := lifecycle.NewTpmClient(a.log)
+	if err != nil {
+		a.log.Infof("tpm is not available: %v", err)
+	}
+
+	// TODO - use tpm key pair & device name if tpm is available
+
 	publicKey, privateKey, _, err := fcrypto.EnsureKey(deviceReadWriter.PathFor(a.config.ManagementService.AuthInfo.ClientKey))
 	if err != nil {
 		return err
@@ -187,6 +196,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.config.ManagementService.GetClientKeyPath(),
 		deviceReadWriter,
 		enrollmentClient,
+		tpmClient,
 		csr,
 		a.config.DefaultLabels,
 		statusManager,
@@ -204,7 +214,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	statusManager.RegisterStatusExporter(systemInfoManager)
 
 	// register internal system info collectors
-	// systemInfoManager.RegisterCollector(ctx, "attestation", lifecycleManager.GetAttestation)
+	systemInfoManager.RegisterCollector(ctx, "attestation", tpmClient.TpmAttestationCollector)
 
 	// create config controller
 	configController := config.NewController(

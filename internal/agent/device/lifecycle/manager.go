@@ -37,6 +37,7 @@ type LifecycleManager struct {
 	deviceReadWriter     fileio.ReadWriter
 
 	enrollmentClient client.Enrollment
+	tpmClient        *TpmClient
 	defaultLabels    map[string]string
 	enrollmentCSR    []byte
 	statusManager    status.Manager
@@ -54,6 +55,7 @@ func NewManager(
 	managementKeyPath string,
 	deviceReadWriter fileio.ReadWriter,
 	enrollmentClient client.Enrollment,
+	tpmClient *TpmClient,
 	enrollmentCSR []byte,
 	defaultLabels map[string]string,
 	statusManager status.Manager,
@@ -69,6 +71,7 @@ func NewManager(
 		managementKeyPath:    managementKeyPath,
 		deviceReadWriter:     deviceReadWriter,
 		enrollmentClient:     enrollmentClient,
+		tpmClient:            tpmClient,
 		enrollmentCSR:        enrollmentCSR,
 		defaultLabels:        defaultLabels,
 		backoff:              backoff,
@@ -80,6 +83,15 @@ func NewManager(
 // Initialize ensures the device is enrolled to the management service.
 func (m *LifecycleManager) Initialize(ctx context.Context, status *v1alpha1.DeviceStatus) error {
 	if !m.IsInitialized() {
+		/*if m.tpmClient != nil {
+			// TODO - trigger TpmAttestationCollector here
+			att := m.tpmClient.TpmAttestationCollector(ctx)
+			if att != "" {
+
+				// TODO - add to device.status.sysInfo unless collectors already do this
+			}
+		}*/
+
 		if err := m.writeEnrollmentBanner(); err != nil {
 			return err
 		}
