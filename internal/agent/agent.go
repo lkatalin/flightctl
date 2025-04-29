@@ -79,7 +79,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	experimentalFeatures := experimental.NewFeatures()
-	publicKey, signer, _, err := getDeviceKeyandSigner(experimentalFeatures, a.log, deviceReadWriter, a.config)
+	publicKey, signer, tpmClient, err := getDeviceKeyandSigner(experimentalFeatures, a.log, deviceReadWriter, a.config)
 	if err != nil {
 		return err
 	}
@@ -205,6 +205,15 @@ func (a *Agent) Run(ctx context.Context) error {
 	statusManager.RegisterStatusExporter(osManager)
 	statusManager.RegisterStatusExporter(specManager)
 	statusManager.RegisterStatusExporter(systemInfoManager)
+
+	// register internal system info collectors
+	if experimentalFeatures.IsEnabled() && tpmClient != nil {
+		a.log.Infof("experimental features enabled: registering TPM info collection functions")
+		systemInfoManager.RegisterCollector(ctx, "tpmVendorInfo", tpmClient.TpmVendorInfoCollector)
+		systemInfoManager.RegisterCollector(ctx, "attestation", tpmClient.TpmAttestationCollector)
+	} else {
+		a.log.Infof("experimental features not enabled: skipping registration of TPM info collection functions")
+	}
 
 	// create config controller
 	configController := config.NewController(
