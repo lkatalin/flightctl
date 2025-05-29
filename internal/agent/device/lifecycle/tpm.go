@@ -101,12 +101,50 @@ func (tc *TpmClient) TpmAttestationCollector(ctx context.Context) string {
 		return ""
 	}
 
-	att, err := tc.tpm.GetAttestation(tc.currNonce, tc.lak)
+	rawAtt, err := tc.tpm.GetRawAttestation(tc.currNonce, tc.lak)
 	if err != nil {
 		tc.log.Errorf("Unable to get TPM attestation: %v", err)
 		return ""
 	}
-	return att.String()
+
+	ek, err := tc.tpm.CreateEKPrimary()
+	if err != nil  {
+		tc.log.Errorf("Unable to get Root Endorsement Key: %v", err)
+	}
+	
+	json, err := tpm.AttestationFromRaw(rawAtt, ek).ToJSON()
+	if err != nil {
+		tc.log.Errorf("Unable to format TPM attestation: %v", err)
+		return ""
+	}
+
+	return string(json)
+}
+
+func (tc *TpmClient) GetAttestationJSON() ([]byte, error) {
+	if tc == nil {
+		return nil, fmt.Errorf("tc is nil")
+	}
+	if tc.tpm == nil {
+		return nil, fmt.Errorf("Cannot get TPM attestation: TPM is unavailable in TpmClient")
+	}
+
+	rawAtt, err := tc.tpm.GetRawAttestation(tc.currNonce, tc.lak)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to get TPM attestation: %v", err)
+	}
+	
+	ek, err := tc.tpm.CreateEKPrimary()
+	if err != nil  {
+		tc.log.Errorf("Unable to get Root Endorsement Key: %v", err)
+	}
+
+	json, err := tpm.AttestationFromRaw(rawAtt, ek).ToJSON()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to format TPM attestation: %v", err)
+	}
+
+	return json, nil
 }
 
 func (tc *TpmClient) UpdateNonce(nonce []byte) error {

@@ -149,6 +149,15 @@ func (a *Agent) Run(ctx context.Context) error {
 			}
 			systemInfoManager.RegisterCollector(ctx, "tpmVendorInfo", tpmClient.TpmVendorInfoCollector)
 			systemInfoManager.RegisterCollector(ctx, "attestation", tpmClient.TpmAttestationCollector)
+
+			a.log.Warn("===== HERE BEGINS DEBUG OUTPUT =====")
+			att, err := tpmClient.GetAttestationJSON()
+			if err != nil {
+				a.log.Warnf("error occurred getting attestation: %v", err)
+			} else {
+				a.log.Warnf("attestation: %s", string(att))
+			}
+
 		}
 	} else {
 		a.log.Debug("Experimental features are not enabled: skipping creation of TPM client and registration of TPM collection functions")

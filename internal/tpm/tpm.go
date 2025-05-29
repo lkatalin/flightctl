@@ -2,7 +2,9 @@ package tpm
 
 import (
 	"bytes"
+	//"crypto"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -10,19 +12,32 @@ import (
 	"github.com/google/go-tpm-tools/client"
 	pbattest "github.com/google/go-tpm-tools/proto/attest"
 	pbtpm "github.com/google/go-tpm-tools/proto/tpm"
-	"github.com/google/go-tpm/legacy/tpm2"
+	legacy "github.com/google/go-tpm/legacy/tpm2"
+	"github.com/google/go-tpm/tpm2"
+	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpmutil"
 )
 
 const (
 	MinNonceLength     = 8
-	TpmSystemPath      = "/dev/tpm0"
+	TpmSystemPath      = "/dev/tpmrm0"
 	TpmVersionInfoPath = "/sys/class/tpm/tpm0/tpm_version_major"
 )
 
 type TPM struct {
 	devicePath string
 	channel    io.ReadWriteCloser
+}
+
+type Attestation struct {
+	//EkPub []byte `json:"ekpub"`
+	EkPub tpm2.TPM2BPublic `json:"ekpub"`
+	EkName tpm2.TPM2BName `json::"ekname"`
+	EkHandle tpm2.TPMHandle `json:"ekhandle"` //maybe temp
+	AkPub []byte `json:"akpub"`
+	AkCert []byte `json:"akcert"`
+	IntermediateCerts [][]byte `json:"intermediatecerts,omitempty"`
+	Quotes []*pbtpm.Quote `json:"quotes"`
 }
 
 // Note: this may be a hardware TPM or a software or emulated TPM available to the system
@@ -73,7 +88,7 @@ func (t *TPM) GetTpmVendorInfo() ([]byte, error) {
 	if t.channel == nil {
 		return nil, fmt.Errorf("cannot get TPM vendor info: no channel available in TPM struct")
 	}
-	return tpm2.GetManufacturer(t.channel)
+	return legacy.GetManufacturer(t.channel)
 }
 
 func (t *TPM) GetPCRValues(measurements map[string]string) error {
@@ -82,7 +97,7 @@ func (t *TPM) GetPCRValues(measurements map[string]string) error {
 	}
 	for pcr := 1; pcr <= 16; pcr++ {
 		key := fmt.Sprintf("pcr%02d", pcr)
-		val, err := tpm2.ReadPCR(t.channel, pcr, tpm2.AlgSHA256)
+		val, err := legacy.ReadPCR(t.channel, pcr, legacy.AlgSHA256)
 		if err != nil {
 			return err
 		}
@@ -90,6 +105,24 @@ func (t *TPM) GetPCRValues(measurements map[string]string) error {
 	}
 	return nil
 }
+
+func (t *TPM) CreateEKPrimary() (*tpm2.CreatePrimaryResponse, error) {
+	createPrimaryCmd := tpm2.CreatePrimary{
+		PrimaryHandle: tpm2.TPMRHEndorsement,
+		InPublic:      tpm2.New2B(tpm2.ECCSRKTemplate),
+	}
+	transportTPM := transport.FromReadWriter(t.channel)
+	createPrimaryRsp, err := createPrimaryCmd.Execute(transportTPM)
+	if err != nil {
+		return nil, fmt.Errorf("creating EK primary: %v", err)
+	}
+	return createPrimaryRsp, nil
+}
+
+// The EK is the root key in the TPM's Endorsement hierarchy. It will regenerate to the same value as long as the Endorsement hierarchy's Primary Seed is not changed.
+/*func (t *TPM) RegenerateEK() (*client.Key, error) {
+	return client.EndorsementKeyECC(t.channel)
+}*/
 
 // The local attestation key (LAK) is an asymmetric key that persists for the device's lifecycle (but not lifetime) and can be zeroized if needed when the device transfers ownership. (The IAK by contrast persists for the device's lifetime across uses and owners.) This key can only be used to sign TPM-internal data, ex. attestations. This is considered a Restricted signing key by the TPM.
 // Key attributes:
@@ -103,7 +136,7 @@ func (t *TPM) CreateLAK() (*client.Key, error) {
 	return client.AttestationKeyECC(t.channel)
 }
 
-func (t *TPM) GetAttestation(nonce []byte, ak *client.Key) (*pbattest.Attestation, error) {
+func (t *TPM) GetRawAttestation(nonce []byte, ak *client.Key) (*pbattest.Attestation, error) {
 	// TODO - may want to use CertChainFetcher in the AttestOpts in the future
 	// see https://pkg.go.dev/github.com/google/go-tpm-tools/client#AttestOpts
 
@@ -117,7 +150,59 @@ func (t *TPM) GetAttestation(nonce []byte, ak *client.Key) (*pbattest.Attestatio
 	return ak.Attest(client.AttestOpts{Nonce: nonce})
 }
 
-func (t *TPM) GetQuote(nonce []byte, ak *client.Key, pcr_selection *tpm2.PCRSelection) (*pbtpm.Quote, error) {
+func AttestationFromRaw(a *pbattest.Attestation, ek *tpm2.CreatePrimaryResponse) *Attestation {
+	return &Attestation{
+		EkPub: ek.OutPublic,
+		EkName: ek.Name,
+		EkHandle: ek.ObjectHandle,
+		AkPub: a.GetAkPub(),
+		AkCert: a.GetAkCert(),
+		IntermediateCerts: a.GetIntermediateCerts(),
+		Quotes: a.GetQuotes(),
+	}
+}
+
+// This function creates a LDevID key pair under the Endorsement hierarchy.
+func (t *TPM) CreateLDevID(ek tpm2.CreatePrimaryResponse) (*tpm2.TPMHandle, error) {
+	createCmd := CreateEndorsementLDevIDCreateTemplate(ek)
+	transportTPM := transport.FromReadWriter(t.channel)
+	createRsp, err := createCmd.Execute(transportTPM)
+	if err != nil {
+		return nil, fmt.Errorf("executing endorsement LDevID create command: %v", err)
+	}
+	loadCmd := tpm2.Load{
+		ParentHandle: tpm2.NamedHandle{
+			Handle: ek.ObjectHandle,
+			Name:   ek.Name,
+		},
+		InPrivate: createRsp.OutPrivate,
+		InPublic:  createRsp.OutPublic,
+	}
+
+	loadRsp, err := loadCmd.Execute(transportTPM)
+	if err != nil {
+		return nil, fmt.Errorf("error loading ldevid key: %v", err)
+	}
+	return &loadRsp.ObjectHandle, nil
+}
+
+func (a *Attestation) ToString() string {
+	return fmt.Sprintf("ekPub: %s\nakPub: %s\nakCert: %s\nintermediateCerts: %s\nquotes: %s\n", a.EkPub, a.AkPub, a.AkCert, a.IntermediateCerts, a.Quotes)	
+}
+
+func (a *Attestation) ToJSON() ([]byte, error) {
+	marshalled, err := json.Marshal(a)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling attestation: %w", err)
+	}
+	fmt.Printf("marshalled as string: %s", string(marshalled))
+	//fmt.Printf("marshalled as bytes: %b", marshalled)
+	//fmt.Printf("just struct as percent s: %s", a)
+	//fmt.Printf("just struct as percent v: %v", a)
+	return marshalled, nil
+}
+
+func (t *TPM) GetQuote(nonce []byte, ak *client.Key, pcr_selection *legacy.PCRSelection) (*pbtpm.Quote, error) {
 	if len(nonce) < MinNonceLength {
 		return nil, fmt.Errorf("nonce does not meet minimum length of %d bytes", MinNonceLength)
 	}
