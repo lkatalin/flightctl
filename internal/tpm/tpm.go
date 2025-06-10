@@ -109,7 +109,7 @@ func (t *TPM) GetPCRValues(measurements map[string]string) error {
 func (t *TPM) CreateEKPrimary() (*tpm2.CreatePrimaryResponse, error) {
 	createPrimaryCmd := tpm2.CreatePrimary{
 		PrimaryHandle: tpm2.TPMRHEndorsement,
-		InPublic:      tpm2.New2B(tpm2.ECCSRKTemplate),
+		InPublic:      tpm2.New2B(tpm2.ECCEKTemplate),
 	}
 	transportTPM := transport.FromReadWriter(t.channel)
 	createPrimaryRsp, err := createPrimaryCmd.Execute(transportTPM)
@@ -151,6 +151,8 @@ func (t *TPM) GetRawAttestation(nonce []byte, ak *client.Key) (*pbattest.Attesta
 }
 
 func AttestationFromRaw(a *pbattest.Attestation, ek *tpm2.CreatePrimaryResponse) *Attestation {
+	contents, _ := ek.OutPublic.Contents()
+	fmt.Printf("contents of ek outpublic: %w", contents)
 	return &Attestation{
 		EkPub: ek.OutPublic,
 		EkName: ek.Name,
