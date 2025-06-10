@@ -53,6 +53,7 @@ import (
 
 // See also - the EK template:
 // https://github.com/google/go-tpm/blob/d88acdb2077207b23d3b5dacc2873169283cf11c/tpm2/templates.go#L146
+// ... that one also has an AuthPolicy, which this doesn't (maybe not needed?)
 
 // TODO - how do we access the IDevID parent?
 func CreateEndorsementLDevIDCreateTemplate(ek tpm2.CreatePrimaryResponse) tpm2.Create {
@@ -68,18 +69,19 @@ func CreateEndorsementLDevIDCreateTemplate(ek tpm2.CreatePrimaryResponse) tpm2.C
             		Type:    tpm2.TPMAlgECC,
             		NameAlg: tpm2.TPMAlgSHA256,
             		ObjectAttributes: tpm2.TPMAObject{
+				// see section 3.9 of https://trustedcomputinggroup.org/wp-content/uploads/TCG_IWG_DevID_v1r2_02dec2020.pdf
                 		FixedTPM:             true, //must stay in TPM
-                		STClear:              true, //cannot be loaded after tpm2_clear
+                		STClear:              true, //cannot be loaded after tpm2_clear - on the ECCEKTemplate this is false?
                 		FixedParent:          true, //can't be re-parented
                 		SensitiveDataOrigin:  true, //TPM generates all sensitive data during creation
-                		UserWithAuth:         true, //true means there are more options for the user to auth
-                		AdminWithPolicy:      false, //false means there are more options for admin
-                		NoDA:                 true, //true means there are dictionary attack protections
-                		EncryptedDuplication: true, //true means there are more robust protections for duplication
+                		UserWithAuth:         true, //true means there are more options for the user to auth - on the ECCEKTemplate this is false
+                		AdminWithPolicy:      false, //false means there are more options for admin - on the ECCEKTemplate this is true
+                		NoDA:                 true, //true means there are dictionary attack protections - on the ECCEKTemplate this is false
+                		EncryptedDuplication: true, //true means there are more robust protections for duplication - on the ECCEKTemplate this is false
                 		Restricted:           false, //false means can be used to sign data from outside tpm
                 		Decrypt:              false, //can be used to decrypt
                 		SignEncrypt:          true, //for asymm, may be used to sign
-                		X509Sign:             false, //false means the key can be used to sign if sign is SET (?)
+                		X509Sign:             false, //false means the key can be used to sign if sign is SET (?) - not present in ECCEKTemplate
             		},
             		Parameters: tpm2.NewTPMUPublicParms(
                 		tpm2.TPMAlgECC,
