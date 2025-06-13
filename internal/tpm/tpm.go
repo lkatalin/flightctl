@@ -2,6 +2,7 @@ package tpm
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
@@ -29,6 +30,8 @@ const (
 type TPM struct {
 	devicePath string
 	channel    io.ReadWriteCloser
+	ldevidHandle tpm2.TPMHandle
+	ldevidName   tpm2.TPM2BName
 }
 
 type Attestation struct {
@@ -191,9 +194,9 @@ func AttestationFromRaw(a *pbattest.Attestation, /*ek *tpm2.CreatePrimaryRespons
 	}
 }
 
-// This function creates a LDevID key pair under the Endorsement hierarchy.
-func (t *TPM) CreateLDevID(ek tpm2.CreatePrimaryResponse) (*tpm2.TPMHandle, error) {
-	createCmd := CreateEndorsementLDevIDCreateTemplate(ek)
+// This function creates a LDevID key pair under the Owner hierarchy.
+func (t *TPM) CreateLDevID(srk tpm2.CreatePrimaryResponse) (*tpm2.TPMHandle, error) {
+	createCmd := CreateEndorsementLDevIDCreateTemplate(srk)
 	transportTPM := transport.FromReadWriter(t.channel)
 	createRsp, err := createCmd.Execute(transportTPM)
 	if err != nil {
@@ -201,8 +204,8 @@ func (t *TPM) CreateLDevID(ek tpm2.CreatePrimaryResponse) (*tpm2.TPMHandle, erro
 	}
 	loadCmd := tpm2.Load{
 		ParentHandle: tpm2.NamedHandle{
-			Handle: ek.ObjectHandle,
-			Name:   ek.Name,
+			Handle: srk.ObjectHandle,
+			Name:   srk.Name,
 		},
 		InPrivate: createRsp.OutPrivate,
 		InPublic:  createRsp.OutPublic,
@@ -212,7 +215,42 @@ func (t *TPM) CreateLDevID(ek tpm2.CreatePrimaryResponse) (*tpm2.TPMHandle, erro
 	if err != nil {
 		return nil, fmt.Errorf("error loading ldevid key: %v", err)
 	}
+	t.ldevidHandle = loadRsp.ObjectHandle
+	t.ldevidName = loadRsp.Name
 	return &loadRsp.ObjectHandle, nil
+}
+
+func (t *TPM) SignwithLDevID(blob []byte) (*tpm2.TPMTSignature, error) {
+	digest := sha256.Sum256(blob)
+	sign := tpm2.Sign{
+		KeyHandle: tpm2.NamedHandle{
+			Handle: t.ldevidHandle,
+			Name:   t.ldevidName,
+		},
+		Digest: tpm2.TPM2BDigest{
+			Buffer: digest[:],
+		},
+		InScheme: tpm2.TPMTSigScheme{
+			Scheme: tpm2.TPMAlgECC,
+			Details: tpm2.NewTPMUSigScheme(
+				tpm2.TPMAlgECC,
+				&tpm2.TPMSSchemeHash{
+					HashAlg: tpm2.TPMAlgSHA256,
+				},
+			),
+		},
+		Validation: tpm2.TPMTTKHashCheck{
+			Tag: tpm2.TPMSTHashCheck,
+		},
+	}
+
+	transportTPM := transport.FromReadWriter(t.channel)
+	signRsp, err := sign.Execute(transportTPM)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign digest with ldevid: %v", err)
+	}
+
+	return &signRsp.Signature, nil
 }
 
 /*func (a *Attestation) ToString() string {
