@@ -107,12 +107,18 @@ func (tc *TpmClient) TpmAttestationCollector(ctx context.Context) string {
 		return ""
 	}
 
-	ek, err := tc.tpm.CreateEKPrimary()
-	if err != nil  {
-		tc.log.Errorf("Unable to get Root Endorsement Key: %v", err)
-	}
+	//ek, err := tc.tpm.CreateEKPrimary()
+	//if err != nil  {
+	//	tc.log.Errorf("Unable to get Root Endorsement Key: %v", err)
+	//}
 	
-	json, err := tpm.AttestationFromRaw(rawAtt, ek).ToJSON()
+	ekcert, err := tc.tpm.GetEKCert(tpm.TpmSystemPath, tpm.EkCertIndex)
+	if err != nil {
+		tc.log.Errorf("Unable to get EK cert: %v", err)
+		return ""
+	}
+
+	json, err := tpm.AttestationFromRaw(rawAtt, ekcert).ToJSON()
 	if err != nil {
 		tc.log.Errorf("Unable to format TPM attestation: %v", err)
 		return ""
@@ -134,12 +140,17 @@ func (tc *TpmClient) GetAttestationJSON() ([]byte, error) {
 		return nil, fmt.Errorf("Unable to get TPM attestation: %v", err)
 	}
 	
-	ek, err := tc.tpm.CreateEKPrimary()
-	if err != nil  {
-		tc.log.Errorf("Unable to get Root Endorsement Key: %v", err)
+	//ek, err := tc.tpm.CreateEKPrimary()
+	//if err != nil  {
+	//	tc.log.Errorf("Unable to get Root Endorsement Key: %v", err)
+	//}
+
+	ekcert, err := tc.tpm.GetEKCert(tpm.TpmSystemPath, tpm.EkCertIndex)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to get EK cert: %v", err)
 	}
 
-	json, err := tpm.AttestationFromRaw(rawAtt, ek).ToJSON()
+	json, err := tpm.AttestationFromRaw(rawAtt, ekcert).ToJSON()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to format TPM attestation: %v", err)
 	}

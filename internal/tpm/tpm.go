@@ -2,9 +2,10 @@ package tpm
 
 import (
 	"bytes"
-	//"crypto"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/asn1"
 	"fmt"
 	"io"
 	"os"
@@ -22,6 +23,7 @@ const (
 	MinNonceLength     = 8
 	TpmSystemPath      = "/dev/tpmrm0"
 	TpmVersionInfoPath = "/sys/class/tpm/tpm0/tpm_version_major"
+	EkCertIndex 	   = 0x01C00002
 )
 
 type TPM struct {
@@ -30,10 +32,10 @@ type TPM struct {
 }
 
 type Attestation struct {
-	//EkPub []byte `json:"ekpub"`
-	EkPub tpm2.TPM2BPublic `json:"ekpub"`
-	EkName tpm2.TPM2BName `json::"ekname"`
-	EkHandle tpm2.TPMHandle `json:"ekhandle"` //maybe temp
+	EkCert []byte `json:"ekpub"`
+	//EkPub tpm2.TPM2BPublic `json:"ekpub"`
+	//EkName tpm2.TPM2BName `json::"ekname"`
+	//EkHandle tpm2.TPMHandle `json:"ekhandle"` //maybe temp
 	AkPub []byte `json:"akpub"`
 	AkCert []byte `json:"akcert"`
 	IntermediateCerts [][]byte `json:"intermediatecerts,omitempty"`
@@ -119,6 +121,30 @@ func (t *TPM) CreateEKPrimary() (*tpm2.CreatePrimaryResponse, error) {
 	return createPrimaryRsp, nil
 }
 
+func (t *TPM) GetEKCert(path string, certIndex uint32) ([]byte, error) {
+        ekCert, err := legacy.NVRead(t.channel, tpmutil.Handle(certIndex))
+        if err != nil {
+                return nil, fmt.Errorf("reading EK cert: %v", err)
+        }
+
+        // Identify if any `padding` exists in the EK cert that was read
+        var raw asn1.RawValue
+        paddingBytes, err := asn1.Unmarshal(ekCert, &raw)
+        if err != nil {
+                return nil, fmt.Errorf("ASN.1 Unmarshal failed for EK cert: %v", err)
+        }
+        fmt.Printf("TPM NV Index bytes read: %d\n", len(ekCert))
+        fmt.Printf("Padding found from ASN.1 Unmarshal: %d\n", len(paddingBytes))
+
+        // Sanity-check that this is a valid certificate.
+        _, err = x509.ParseCertificate(ekCert[0 : len(ekCert)-len(paddingBytes)])
+        if err != nil {
+                return nil, fmt.Errorf("parsing EK cert: %v", err)
+        }
+
+        return ekCert, nil
+}
+
 // The EK is the root key in the TPM's Endorsement hierarchy. It will regenerate to the same value as long as the Endorsement hierarchy's Primary Seed is not changed.
 /*func (t *TPM) RegenerateEK() (*client.Key, error) {
 	return client.EndorsementKeyECC(t.channel)
@@ -150,13 +176,14 @@ func (t *TPM) GetRawAttestation(nonce []byte, ak *client.Key) (*pbattest.Attesta
 	return ak.Attest(client.AttestOpts{Nonce: nonce})
 }
 
-func AttestationFromRaw(a *pbattest.Attestation, ek *tpm2.CreatePrimaryResponse) *Attestation {
-	contents, _ := ek.OutPublic.Contents()
-	fmt.Printf("contents of ek outpublic: %w", contents)
+func AttestationFromRaw(a *pbattest.Attestation, /*ek *tpm2.CreatePrimaryResponse,*/ ekCert []byte) *Attestation {
+	//contents, _ := ek.OutPublic.Contents()
+	//fmt.Printf("contents of ek outpublic: %w", contents)
 	return &Attestation{
-		EkPub: ek.OutPublic,
-		EkName: ek.Name,
-		EkHandle: ek.ObjectHandle,
+		EkCert: ekCert,
+		//EkPub: ek.OutPublic,
+		//EkName: ek.Name,
+		//EkHandle: ek.ObjectHandle,
 		AkPub: a.GetAkPub(),
 		AkCert: a.GetAkCert(),
 		IntermediateCerts: a.GetIntermediateCerts(),
@@ -188,9 +215,9 @@ func (t *TPM) CreateLDevID(ek tpm2.CreatePrimaryResponse) (*tpm2.TPMHandle, erro
 	return &loadRsp.ObjectHandle, nil
 }
 
-func (a *Attestation) ToString() string {
+/*func (a *Attestation) ToString() string {
 	return fmt.Sprintf("ekPub: %s\nakPub: %s\nakCert: %s\nintermediateCerts: %s\nquotes: %s\n", a.EkPub, a.AkPub, a.AkCert, a.IntermediateCerts, a.Quotes)	
-}
+}*/
 
 func (a *Attestation) ToJSON() ([]byte, error) {
 	marshalled, err := json.Marshal(a)
