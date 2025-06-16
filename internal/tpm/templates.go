@@ -12,6 +12,13 @@ func CreateOwnerLDevIDTemplate(srk tpm2.CreatePrimaryResponse) tpm2.Create {
 			Handle: srk.ObjectHandle,
 			Name:   srk.Name,
 		},
+		/*InSensitive: tpm2.TPM2BSensitiveCreate{
+			Sensitive: &tpm2.TPMSSensitiveCreate{
+				UserAuth: tpm2.TPM2BAuth{
+					Buffer: []byte(""),
+				},
+			},
+		},*/
 		InPublic: tpm2.New2B(tpm2.TPMTPublic{
 			Type:    tpm2.TPMAlgECC,
 			NameAlg: tpm2.TPMAlgSHA256,
@@ -31,22 +38,8 @@ func CreateOwnerLDevIDTemplate(srk tpm2.CreatePrimaryResponse) tpm2.Create {
 			Parameters: tpm2.NewTPMUPublicParms(
 				tpm2.TPMAlgECC,
 				&tpm2.TPMSECCParms{
-					Symmetric: tpm2.TPMTSymDefObject{
-						Algorithm: tpm2.TPMAlgNull,
-						// keybits should be NULL
-						KeyBits: tpm2.NewTPMUSymKeyBits(
-							tpm2.TPMAlgNull,
-							tpm2.TPMKeyBits(0),
-						),
-						// mode should be NULL
-						Mode: tpm2.NewTPMUSymMode(
-							tpm2.TPMAlgNull,
-							tpm2.TPMAlgNull,
-						),
-					},
 					Scheme: tpm2.TPMTECCScheme{
 						Scheme: tpm2.TPMAlgECDSA,
-						// details should be NULL
 						Details: tpm2.NewTPMUAsymScheme(
 							tpm2.TPMAlgECDSA,
 							&tpm2.TPMSSigSchemeECDSA{
@@ -55,19 +48,26 @@ func CreateOwnerLDevIDTemplate(srk tpm2.CreatePrimaryResponse) tpm2.Create {
 						),
 					},
 					CurveID: tpm2.TPMECCNistP256,
-					// KDF should be NULL
-					KDF: tpm2.TPMTKDFScheme{
-						Scheme: tpm2.TPMAlgNull,
-					},
 				},
 			),
 			Unique: tpm2.NewTPMUPublicID(
 				tpm2.TPMAlgECC,
 				&tpm2.TPMSECCPoint{
-					X: tpm2.TPM2BECCParameter{Buffer: make([]byte, 32)},
-					Y: tpm2.TPM2BECCParameter{Buffer: make([]byte, 32)},
+					X: tpm2.TPM2BECCParameter{
+						Buffer: make([]byte, 32),
+					},
+					Y: tpm2.TPM2BECCParameter{
+						Buffer: make([]byte, 32),
+					},
 				},
 			),
+			/*Unique: tpm2.NewTPMUPublicID(
+				tpm2.TPMAlgECC,
+				&tpm2.TPMSECCPoint{
+					X: tpm2.TPM2BECCParameter{Buffer: ecdsaKey.X.Bytes()},
+					Y: tpm2.TPM2BECCParameter{Buffer: ecdsaKey.Y.Bytes()},
+				},
+			),*/
 		}),
 	}
 }

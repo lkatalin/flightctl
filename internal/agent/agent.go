@@ -3,6 +3,9 @@ package agent
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"encoding/base32"
 	"fmt"
 	"path/filepath"
@@ -78,12 +81,16 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.config.ManagementService.Config.AuthInfo.ClientCertificate = filepath.Join(a.config.DataDir, agent_config.DefaultCertsDirName, agent_config.GeneratedCertFile)
 		a.config.ManagementService.Config.AuthInfo.ClientKey = filepath.Join(a.config.DataDir, agent_config.DefaultCertsDirName, agent_config.KeyFile)
 	}
-	publicKey, privateKey, _, err := fcrypto.EnsureKey(deviceReadWriter.PathFor(a.config.ManagementService.AuthInfo.ClientKey))
+	var publicKey crypto.PublicKey
+	var privateKey crypto.PrivateKey
+	var publicKeyHash []byte
+	var err error
+	publicKey, privateKey, _, err = fcrypto.EnsureKey(deviceReadWriter.PathFor(a.config.ManagementService.AuthInfo.ClientKey))
 	if err != nil {
 		return err
 	}
 
-	publicKeyHash, err := fcrypto.HashPublicKey(publicKey)
+	publicKeyHash, err = fcrypto.HashPublicKey(publicKey)
 	if err != nil {
 		return err
 	}
@@ -148,6 +155,50 @@ func (a *Agent) Run(ctx context.Context) error {
 			}
 			systemInfoManager.RegisterCollector(ctx, "tpmVendorInfo", tpmClient.TpmVendorInfoCollector)
 			systemInfoManager.RegisterCollector(ctx, "attestation", tpmClient.TpmAttestationCollector)
+
+			a.log.Warn("Experimental features enabled: creating TPM hardware identity")
+
+			// overwrite previous CSR and device name
+			tpmSigner := tpmClient.GetLDevIDSigner()
+			// ============= testing ========================= /
+			ts, ok := tpmSigner.(crypto.Signer)
+			if !ok {
+				a.log.Errorf("could not convert tpmSigner to crypto.Signer")
+			}
+			switch pub := ts.Public().(type) {
+			case *rsa.PublicKey:
+				//pubType = RSA
+				//defaultAlgo = SHA256WithRSA
+				a.log.Warn("public key is RSA type")
+			case *ecdsa.PublicKey:
+				//pubType = ECDSA
+				a.log.Warn("public key is ECDSA type")
+			case ed25519.PublicKey:
+				a.log.Warn("public key is ed5519 type")
+			default:
+				a.log.Warnf("key type is: %s or %w", pub, pub)
+			}
+			// =============================================== /
+			publicKey := tpmClient.GetLDevIDPublic()
+			publicKeyHash, err := fcrypto.HashPublicKey(publicKey)
+			if err != nil {
+				a.log.Errorf("Unable to create public key hash for TPM key: %v", err)
+			}
+			deviceName := strings.ToLower(base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString(publicKeyHash))
+			tpmCsr, err := fcrypto.MakeCSR(ts, deviceName)
+			if err != nil {
+				a.log.Errorf("Unable to create CSR with TPM key: %v", err)
+			}
+			csr = tpmCsr
+
+			// test
+			cert, err := fcrypto.ParseCSR(tpmCsr)
+			if err != nil {
+				a.log.Errorf("ERROR: CSR was invalid: %v", err)
+			} else {
+				a.log.Errorf("SUCCESS: CSR was valid")
+				a.log.Errorf("certificate: %w", cert)
+			}
 		}
 	} else {
 		a.log.Debug("Experimental features are not enabled: skipping creation of TPM client and registration of TPM collection functions")

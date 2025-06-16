@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/sha256"
+	//"crypto/sha256"
 	"encoding/asn1"
 	"encoding/hex"
 	"fmt"
@@ -32,8 +32,8 @@ type TPM struct {
 	channel      io.ReadWriteCloser
 	ldevidHandle *tpm2.TPMHandle
 	ldevidName   *tpm2.TPM2BName
-	ldevidPub    *crypto.PublicKey
-	ldevidSigner crypto.Signer
+	ldevidPub    crypto.PublicKey
+	//ldevidSigner crypto.Signer
 }
 
 // Note: this may be a hardware TPM or a software or emulated TPM available to the system
@@ -203,36 +203,27 @@ func (t *TPM) GetLDevIDPubKey() (*crypto.PublicKey, error) {
 		Y:     big.NewInt(0).SetBytes(unique.Y.Buffer),
 	}
 	var cryptopubkey crypto.PublicKey = pubkey
-	t.ldevidPub = &cryptopubkey
+	t.ldevidPub = cryptopubkey
 	return &cryptopubkey, nil
 }
 
-func (t *TPM) Public() crypto.PublicKey {
+func (t TPM) Public() crypto.PublicKey {
 	return t.ldevidPub
 }
 
-func (t *TPM) GetSigner() crypto.Signer {
-	return t.ldevidSigner
+func (t TPM) GetSigner() crypto.Signer {
+	return t
 }
 
-func (t *TPM) Sign(rand io.Reader, data []byte, opts crypto.SignerOpts) ([]byte, error) {
-	digest := sha256.Sum256(data)
+func (t TPM) Sign(rand io.Reader, data []byte, opts crypto.SignerOpts) ([]byte, error) {
+	//digest := sha256.Sum256(data)
 	sign := tpm2.Sign{
 		KeyHandle: tpm2.NamedHandle{
 			Handle: *t.ldevidHandle,
 			Name:   *t.ldevidName,
 		},
 		Digest: tpm2.TPM2BDigest{
-			Buffer: digest[:],
-		},
-		InScheme: tpm2.TPMTSigScheme{
-			Scheme: tpm2.TPMAlgECC,
-			Details: tpm2.NewTPMUSigScheme(
-				tpm2.TPMAlgECC,
-				&tpm2.TPMSSchemeHash{
-					HashAlg: tpm2.TPMAlgSHA256,
-				},
-			),
+			Buffer: data[:],
 		},
 		Validation: tpm2.TPMTTKHashCheck{
 			Tag: tpm2.TPMSTHashCheck,
