@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/ecdsa"
+	//"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -221,13 +222,14 @@ func (t *TPM) CreateLDevID(srk tpm2.CreatePrimaryResponse) (*tpm2.TPMHandle, err
 	}
 	t.ldevid.handle = &loadRsp.ObjectHandle
 	t.ldevid.name = &loadRsp.Name
+	t.ldevid.transportTPM = &transportTPM
 	return &loadRsp.ObjectHandle, nil
 }
 
-func (t *TPM) PubKeyFromHandle(h *tpm2.TPMHandle) (*crypto.PublicKey, error) {
+func (t *TPM) GetLDevIDPubKey() (*crypto.PublicKey, error) {
 	transportTPM := transport.FromReadWriter(t.channel)
 	pub, err := tpm2.ReadPublic{
-		ObjectHandle: *h,
+		ObjectHandle: *t.ldevid.handle,
 	}.Execute(transportTPM)
 	if err != nil {
 		return nil, fmt.Errorf("could not read public key: %v", err)
@@ -257,6 +259,7 @@ func (t *TPM) PubKeyFromHandle(h *tpm2.TPMHandle) (*crypto.PublicKey, error) {
 		Y:     big.NewInt(0).SetBytes(unique.Y.Buffer),
 	}
 	var cryptopubkey crypto.PublicKey = pubkey
+	t.ldevid.pubkey = cryptopubkey
 	return &cryptopubkey, nil
 }
 
@@ -264,22 +267,19 @@ type LDevID struct {
 	handle *tpm2.TPMHandle
 	name *tpm2.TPM2BName
 	pubkey crypto.PublicKey
+	transportTPM *transport.TPM
 }
 
 func (l LDevID) Public() crypto.PublicKey {
 	return l.pubkey
 }
 
-//func (l LDevID) Sign() {
-
-//}
-
-func (t *TPM) SignwithLDevID(blob []byte) (*tpm2.TPMTSignature, error) {
-	digest := sha256.Sum256(blob)
+func (l LDevID) Sign(rand io.Reader, data []byte, opts crypto.SignerOpts) ([]byte, error) {
+	digest := sha256.Sum256(data)
 	sign := tpm2.Sign{
 		KeyHandle: tpm2.NamedHandle{
-			Handle: *t.ldevid.handle,
-			Name:   *t.ldevid.name,
+			Handle: *l.handle,
+			Name:   *l.name,
 		},
 		Digest: tpm2.TPM2BDigest{
 			Buffer: digest[:],
@@ -298,16 +298,32 @@ func (t *TPM) SignwithLDevID(blob []byte) (*tpm2.TPMTSignature, error) {
 		},
 	}
 
-	transportTPM := transport.FromReadWriter(t.channel)
-	signRsp, err := sign.Execute(transportTPM)
+	//transportTPM := transport.FromReadWriter(t.channel)
+	signRsp, err := sign.Execute(*l.transportTPM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign digest with ldevid: %v", err)
 	}
-
-	return &signRsp.Signature, nil
+	ecdsaSig, err := signRsp.Signature.Signature.ECDSA()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ECDSA signature from sign response: %v", err)
+	}
+	r := ecdsaSig.SignatureR.Buffer
+	s := ecdsaSig.SignatureS.Buffer
+	bigR := new(big.Int)
+	bigS := new(big.Int)
+	bigR.SetBytes(r)
+	bigS.SetBytes(s)
+	es := EcdsaSignature{
+		R: bigR,
+		S: bigS,
+	}
+	return asn1.Marshal(es)
 }
 
-
+type EcdsaSignature struct {
+	R *big.Int
+	S *big.Int
+}
 
 /*func (a *Attestation) ToString() string {
 	return fmt.Sprintf("ekPub: %s\nakPub: %s\nakCert: %s\nintermediateCerts: %s\nquotes: %s\n", a.EkPub, a.AkPub, a.AkCert, a.IntermediateCerts, a.Quotes)	
