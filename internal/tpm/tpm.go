@@ -2,6 +2,8 @@ package tpm
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -9,6 +11,7 @@ import (
 	"encoding/asn1"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 
 	"github.com/google/go-tpm-tools/client"
@@ -30,8 +33,9 @@ const (
 type TPM struct {
 	devicePath string
 	channel    io.ReadWriteCloser
-	ldevidHandle tpm2.TPMHandle
-	ldevidName   tpm2.TPM2BName
+	ldevid	   LDevID
+	//ldevidHandle tpm2.TPMHandle
+	//ldevidName   tpm2.TPM2BName
 }
 
 type Attestation struct {
@@ -215,17 +219,67 @@ func (t *TPM) CreateLDevID(srk tpm2.CreatePrimaryResponse) (*tpm2.TPMHandle, err
 	if err != nil {
 		return nil, fmt.Errorf("error loading ldevid key: %v", err)
 	}
-	t.ldevidHandle = loadRsp.ObjectHandle
-	t.ldevidName = loadRsp.Name
+	t.ldevid.handle = &loadRsp.ObjectHandle
+	t.ldevid.name = &loadRsp.Name
 	return &loadRsp.ObjectHandle, nil
 }
+
+func (t *TPM) PubKeyFromHandle(h *tpm2.TPMHandle) (*crypto.PublicKey, error) {
+	transportTPM := transport.FromReadWriter(t.channel)
+	pub, err := tpm2.ReadPublic{
+		ObjectHandle: *h,
+	}.Execute(transportTPM)
+	if err != nil {
+		return nil, fmt.Errorf("could not read public key: %v", err)
+	}
+	outpub, err := pub.OutPublic.Contents()
+	if err != nil {
+		return nil, fmt.Errorf("could not get contents of TPM2Bpublic: %v", err)
+	}
+	if outpub.Type != tpm2.TPMAlgECC {
+		return nil, fmt.Errorf("public key alg %s for ldevid key %s is unsupported", outpub.Type)
+	}
+	details, err := outpub.Parameters.ECCDetail()
+	if err != nil {
+		return nil, fmt.Errorf("cannot read ecc details for ldevid key: %v", err)
+	}
+	curve, err := details.CurveID.Curve()
+	if err != nil {
+		return nil, fmt.Errorf("could not get curve id for ldevid key: %v", err)
+	}
+	unique, err := outpub.Unique.ECC()
+	if err != nil {
+		return nil, fmt.Errorf("could not get unique parameters for ldevid key: %v", err)
+	}
+	pubkey := &ecdsa.PublicKey{
+		Curve: curve,
+		X:     big.NewInt(0).SetBytes(unique.X.Buffer),
+		Y:     big.NewInt(0).SetBytes(unique.Y.Buffer),
+	}
+	var cryptopubkey crypto.PublicKey = pubkey
+	return &cryptopubkey, nil
+}
+
+type LDevID struct {
+	handle *tpm2.TPMHandle
+	name *tpm2.TPM2BName
+	pubkey crypto.PublicKey
+}
+
+func (l LDevID) Public() crypto.PublicKey {
+	return l.pubkey
+}
+
+//func (l LDevID) Sign() {
+
+//}
 
 func (t *TPM) SignwithLDevID(blob []byte) (*tpm2.TPMTSignature, error) {
 	digest := sha256.Sum256(blob)
 	sign := tpm2.Sign{
 		KeyHandle: tpm2.NamedHandle{
-			Handle: t.ldevidHandle,
-			Name:   t.ldevidName,
+			Handle: *t.ldevid.handle,
+			Name:   *t.ldevid.name,
 		},
 		Digest: tpm2.TPM2BDigest{
 			Buffer: digest[:],
@@ -252,6 +306,8 @@ func (t *TPM) SignwithLDevID(blob []byte) (*tpm2.TPMTSignature, error) {
 
 	return &signRsp.Signature, nil
 }
+
+
 
 /*func (a *Attestation) ToString() string {
 	return fmt.Sprintf("ekPub: %s\nakPub: %s\nakCert: %s\nintermediateCerts: %s\nquotes: %s\n", a.EkPub, a.AkPub, a.AkCert, a.IntermediateCerts, a.Quotes)	
