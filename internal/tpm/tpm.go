@@ -34,9 +34,11 @@ const (
 type TPM struct {
 	devicePath string
 	channel    io.ReadWriteCloser
-	ldevid	   LDevID
-	//ldevidHandle tpm2.TPMHandle
-	//ldevidName   tpm2.TPM2BName
+	//ldevid	   LDevID
+	ldevidHandle *tpm2.TPMHandle
+	ldevidName   *tpm2.TPM2BName
+	ldevidPub    *crypto.PublicKey
+	ldevidSigner crypto.Signer
 }
 
 type Attestation struct {
@@ -220,16 +222,15 @@ func (t *TPM) CreateLDevID(srk tpm2.CreatePrimaryResponse) (*tpm2.TPMHandle, err
 	if err != nil {
 		return nil, fmt.Errorf("error loading ldevid key: %v", err)
 	}
-	t.ldevid.handle = &loadRsp.ObjectHandle
-	t.ldevid.name = &loadRsp.Name
-	t.ldevid.transportTPM = &transportTPM
+	t.ldevidHandle = &loadRsp.ObjectHandle
+	t.ldevidName = &loadRsp.Name
 	return &loadRsp.ObjectHandle, nil
 }
 
 func (t *TPM) GetLDevIDPubKey() (*crypto.PublicKey, error) {
 	transportTPM := transport.FromReadWriter(t.channel)
 	pub, err := tpm2.ReadPublic{
-		ObjectHandle: *t.ldevid.handle,
+		ObjectHandle: *t.ldevidHandle,
 	}.Execute(transportTPM)
 	if err != nil {
 		return nil, fmt.Errorf("could not read public key: %v", err)
@@ -259,27 +260,31 @@ func (t *TPM) GetLDevIDPubKey() (*crypto.PublicKey, error) {
 		Y:     big.NewInt(0).SetBytes(unique.Y.Buffer),
 	}
 	var cryptopubkey crypto.PublicKey = pubkey
-	t.ldevid.pubkey = cryptopubkey
+	t.ldevidPub = &cryptopubkey
 	return &cryptopubkey, nil
 }
 
-type LDevID struct {
+/*type LDevID struct {
 	handle *tpm2.TPMHandle
 	name *tpm2.TPM2BName
 	pubkey crypto.PublicKey
 	transportTPM *transport.TPM
+}*/
+
+func (t *TPM) Public() crypto.PublicKey {
+	return t.ldevidPub
 }
 
-func (l LDevID) Public() crypto.PublicKey {
-	return l.pubkey
+func (t *TPM) GetSigner() crypto.Signer {
+	return t.ldevidSigner
 }
 
-func (l LDevID) Sign(rand io.Reader, data []byte, opts crypto.SignerOpts) ([]byte, error) {
+func (t *TPM) Sign(rand io.Reader, data []byte, opts crypto.SignerOpts) ([]byte, error) {
 	digest := sha256.Sum256(data)
 	sign := tpm2.Sign{
 		KeyHandle: tpm2.NamedHandle{
-			Handle: *l.handle,
-			Name:   *l.name,
+			Handle: *t.ldevidHandle,
+			Name:   *t.ldevidName,
 		},
 		Digest: tpm2.TPM2BDigest{
 			Buffer: digest[:],
@@ -298,8 +303,8 @@ func (l LDevID) Sign(rand io.Reader, data []byte, opts crypto.SignerOpts) ([]byt
 		},
 	}
 
-	//transportTPM := transport.FromReadWriter(t.channel)
-	signRsp, err := sign.Execute(*l.transportTPM)
+	transportTPM := transport.FromReadWriter(t.channel)
+	signRsp, err := sign.Execute(transportTPM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign digest with ldevid: %v", err)
 	}

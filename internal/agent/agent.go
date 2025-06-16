@@ -158,6 +158,17 @@ func (a *Agent) Run(ctx context.Context) error {
 				a.log.Warnf("attestation: %s", string(att))
 			}
 
+			// overwrite previous private key and CSR
+			tpmSigner := tpmClient.GetLDevIDSigner()
+			tpmCsr, err := fcrypto.MakeCSR(tpmSigner, deviceName)
+			//fcrypto.MakeCSR(privateKey.(crypto.Signer), deviceName)
+			if err != nil {
+				a.log.Errorf("Unable to create CSR with TPM key: %v", err)
+			}
+			publicKey = tpmClient.GetLDevIDPublic()
+			privateKey = tpmSigner
+			csr = tpmCsr
+
 		}
 	} else {
 		a.log.Debug("Experimental features are not enabled: skipping creation of TPM client and registration of TPM collection functions")

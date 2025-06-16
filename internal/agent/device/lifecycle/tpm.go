@@ -51,8 +51,12 @@ func (tc *TpmClient) GetLocalAttestationPubKey() crypto.PublicKey {
 	return tc.lak.PublicKey()
 }
 
-func (tc *TpmClient) GetSigner() (crypto.Signer, error) {
-	return tc.lak.GetSigner()
+func (tc *TpmClient) GetLDevIDSigner() crypto.Signer {
+	return tc.tpm.GetSigner()
+}
+
+func (tc *TpmClient) GetLDevIDPublic() crypto.PublicKey {
+	return tc.tpm.Public()
 }
 
 func (tc *TpmClient) OpenTPM() error {
