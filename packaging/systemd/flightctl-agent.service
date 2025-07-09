@@ -10,6 +10,7 @@ StartLimitBurst=infinity
 
 
 [Service]
+Environment="FLIGHTCTL_EXPERIMENTAL_FEATURES_ENABLED=true"
 ExecStart=/usr/bin/flightctl-agent
 Restart=always
 Type=notify

@@ -127,6 +127,8 @@ func (a *Agent) Run(ctx context.Context) error {
 	csr, err := fcrypto.MakeCSR(signer, deviceName)
 	if err != nil {
 		return err
+	} else {
+		a.log.Warnf("CSR creation succeeded: %v", csr)
 	}
 
 	executer := &executer.CommonExecuter{}
