@@ -63,10 +63,27 @@ ifeq ($(TPM),enabled)
 	@echo "TPM is enabled - configuring TPM manufacturer CA certificates..."
 	@mkdir -p bin/tpm-cas
 	@find tpm-manufacturer-certs -type f -name "*.pem" -exec cp {} bin/tpm-cas/ \;
-	@echo "Copied $$(ls bin/tpm-cas/*.pem 2>/dev/null | wc -l) TPM CA certificates to bin/tpm-cas/"
+	@echo "Copied $$(ls bin/tpm-cas/*.pem 2>/dev/null | wc -l) TPM manufacturer CA certificates to bin/tpm-cas/"
 	@if [ ! -f bin/tpm-cas/*.pem ]; then \
 		echo "ERROR: No TPM CA certificates found in tpm-manufacturer-certs/"; \
 		exit 1; \
+	fi
+	@echo "Looking for swtpm-localca certificates for emulated TPM testing..."
+	@if [ -f /var/lib/swtpm-localca/swtpm-localca-rootca-cert.pem ] && [ -f /var/lib/swtpm-localca/issuercert.pem ]; then \
+		echo "  Found system-wide swtpm-localca at /var/lib/swtpm-localca/ (requires sudo)"; \
+		sudo cp /var/lib/swtpm-localca/swtpm-localca-rootca-cert.pem bin/tpm-cas/; \
+		sudo cp /var/lib/swtpm-localca/issuercert.pem bin/tpm-cas/swtpm-localca-issuer-cert.pem; \
+		sudo chown $(shell id -u):$(shell id -g) bin/tpm-cas/swtpm-localca-*.pem; \
+		echo "✓ Added swtpm-localca root and intermediate CAs from system directory"; \
+	elif [ -r ~/.config/var/lib/swtpm-localca/swtpm-localca-rootca-cert.pem ] && [ -r ~/.config/var/lib/swtpm-localca/issuercert.pem ]; then \
+		echo "  Found user swtpm-localca at ~/.config/var/lib/swtpm-localca/"; \
+		cp ~/.config/var/lib/swtpm-localca/swtpm-localca-rootca-cert.pem bin/tpm-cas/; \
+		cp ~/.config/var/lib/swtpm-localca/issuercert.pem bin/tpm-cas/swtpm-localca-issuer-cert.pem; \
+		echo "✓ Added swtpm-localca root and intermediate CAs from user directory"; \
+	else \
+		echo "  WARNING: No swtpm-localca certificates found - TPM enrollment with emulated TPM will fail"; \
+		echo "  Searched: /var/lib/swtpm-localca/ and ~/.config/var/lib/swtpm-localca/"; \
+		echo "  Note: swtpm certificates are created automatically when swtpm first runs"; \
 	fi
 	NAMESPACE=flightctl-external test/scripts/add-certs-to-deployment.sh bin/tpm-cas
 else
