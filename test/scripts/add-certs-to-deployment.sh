@@ -10,6 +10,9 @@ cleanup() {
     if [ -n "${API_CONFIG_PATCH:-}" ] && [ -f "${API_CONFIG_PATCH}" ]; then
         rm -f "${API_CONFIG_PATCH}"
     fi
+    if [ -n "${TPM_CA_PATHS_FILE:-}" ] && [ -f "${TPM_CA_PATHS_FILE}" ]; then
+        rm -f "${TPM_CA_PATHS_FILE}"
+    fi
 }
 
 # Function to validate certificate file
@@ -177,22 +180,66 @@ fi
 echo "Updating API server configuration with TPM CA paths..."
 echo "TPM CA paths: ${TPM_CA_PATHS_JSON}"
 
-# Create a patch file for the API server config
+# Create temporary files
 API_CONFIG_PATCH=$(mktemp)
+TPM_CA_PATHS_FILE=$(mktemp)
+
+# Write TPM CA paths JSON to a temp file
+echo "${TPM_CA_PATHS_JSON}" > "${TPM_CA_PATHS_FILE}"
 
 # Ensure API config ConfigMap exists
 if ! kubectl get configmap flightctl-api-config -n "${NAMESPACE}" >/dev/null 2>&1; then
     echo "ERROR: ConfigMap 'flightctl-api-config' not found in namespace ${NAMESPACE}"
+    rm -f "${TPM_CA_PATHS_FILE}"
     exit 1
 fi
 # Get current config and add/update tpmCAPaths under service section
 kubectl get configmap flightctl-api-config -n "${NAMESPACE}" -o jsonpath='{.data.config\.yaml}' > "${API_CONFIG_PATCH}"
 
-# Use yq to properly set tpmCAPaths under the service section
-yq eval ".service.tpmCAPaths = ${TPM_CA_PATHS_JSON}" -i "${API_CONFIG_PATCH}"
+# Use Python to update the YAML (more portable than yq)
+python3 -c "
+import sys
+import json
+import yaml
 
-echo "Updated API configuration:"
-yq eval '.service.tpmCAPaths' "${API_CONFIG_PATCH}"
+# Read the YAML config
+with open('${API_CONFIG_PATCH}', 'r') as f:
+    config = yaml.safe_load(f)
+
+# Read the JSON array of TPM CA paths from file
+with open('${TPM_CA_PATHS_FILE}', 'r') as f:
+    tpm_ca_paths = json.load(f)
+
+# Ensure service section exists
+if 'service' not in config:
+    config['service'] = {}
+
+# Set tpmCAPaths
+config['service']['tpmCAPaths'] = tpm_ca_paths
+
+# Write back the updated YAML
+with open('${API_CONFIG_PATCH}', 'w') as f:
+    yaml.dump(config, f, default_flow_style=False)
+" || {
+    echo "ERROR: Failed to update config. Ensure Python 3 and PyYAML are installed."
+    echo "Install with: pip3 install pyyaml"
+    rm -f "${TPM_CA_PATHS_FILE}"
+    exit 1
+}
+
+# Clean up the JSON temp file
+rm -f "${TPM_CA_PATHS_FILE}"
+
+echo "Updated API configuration with TPM CA paths:"
+python3 -c "
+import yaml
+with open('${API_CONFIG_PATCH}', 'r') as f:
+    config = yaml.safe_load(f)
+    if 'service' in config and 'tpmCAPaths' in config['service']:
+        print('  tpmCAPaths:')
+        for path in config['service']['tpmCAPaths']:
+            print(f'    - {path}')
+"
 
 # Apply the updated config
 kubectl create configmap flightctl-api-config-new -n "${NAMESPACE}" --from-file=config.yaml="${API_CONFIG_PATCH}" --dry-run=client -o yaml | kubectl apply -f -
