@@ -677,7 +677,9 @@ func verifyEKCertificateChain(ekCert *x509.Certificate, trustedRoots *x509.CertP
 
 	_, err := ekCert.Verify(opts)
 	if err != nil {
-		return fmt.Errorf("chain validation failed: %w", err)
+		// Include the CN of the unknown authority in the error message
+		return fmt.Errorf("chain validation failed for certificate issued by CN=%s: %w",
+			ekCert.Issuer.CommonName, err)
 	}
 
 	fmt.Printf("[TPM EK Verify] Successfully verified EK certificate chain\n")
