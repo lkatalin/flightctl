@@ -194,6 +194,8 @@ prepare-swtpm-certs:
 
 clean-swtpm-certs:
 	rm -rf $(TEMP_SWTPM_CERT_DIR)
+	rm -rf bin/swtpm-ca
+	rm -rf bin/swtpm-vm-config
 
 .PHONY: test run-test git-server-container e2e-agent-images push-e2e-agent-images
 

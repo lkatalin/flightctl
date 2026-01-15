@@ -1,68 +1,124 @@
 # SWTPM Test CA Certificates
 
-This directory is intentionally kept empty. swtpm CA certificates are auto-discovered during deployment.
+This directory is intentionally kept empty. Test swtpm CA certificates are automatically created during deployment.
 
-## Automatic Certificate Discovery
+## Automatic Test CA Creation
 
-When you run `TPM=enabled make deploy`, the deployment script automatically discovers
-and copies the swtpm CA certificates from your system:
+When you run `TPM=enabled make deploy`, a **single test swtpm CA** is automatically created for the entire test environment. This ensures both the server and agent-VMs use the same CA, eliminating certificate mismatch issues.
 
-1. **First tries**: `/var/lib/swtpm-localca/` (system-wide swtpm, used by libvirt/QEMU)
-   - **Note**: This requires sudo access to read the certificates
-   - You may be prompted for your password during deployment
-2. **Falls back to**: `~/.config/var/lib/swtpm-localca/` (user-specific swtpm)
-   - No sudo required
+**⚠️ WARNING: This is for TESTING ONLY. Never use in production.**
 
-This ensures the deployed CA certificates always match the actual swtpm installation
-that will sign EK certificates for your agent VMs.
+### How It Works
 
-**You don't need to manually copy any certificates to this directory.**
+1. **Server deployment** (`TPM=enabled make deploy`):
+   - Creates a new test swtpm CA in `bin/swtpm-ca/`
+   - Generates root CA (`swtpm-localca-rootca`) and intermediate CA (`swtpm-localca`)
+   - Deploys these CA certificates to the server
+   - Server trusts EK certificates signed by this test CA
+
+2. **Agent-VM creation** (`TPM=enabled make agent-vm`):
+   - Configures the VM's swtpm emulator to use the same test CA from `bin/swtpm-ca/`
+   - VM's TPM generates EK certificate signed by the test CA
+   - Server can validate the EK certificate because it trusts the test CA
+
+### Files Created
+
+When `TPM=enabled make deploy` runs, it creates `bin/swtpm-ca/` with:
+
+- `swtpm-localca-rootca-cert.pem` - Root CA certificate (CN=swtpm-localca-rootca)
+- `swtpm-localca-rootca-privkey.pem` - Root CA private key
+- `issuercert.pem` - Intermediate CA certificate (CN=swtpm-localca)
+- `signkey.pem` - Intermediate CA private key (used to sign EK certificates)
+- `certserial` - Certificate serial number tracker
+
+**You don't need to manually create or copy any certificates.**
 
 ## Certificate Chain
 
-When using emulated TPM (swtpm) for development and testing, the TPM endorsement key
-certificates are signed by a certificate chain:
+The test CA creates this certificate chain:
 
 1. **Root CA**: `swtpm-localca-rootca` (CN=swtpm-localca-rootca)
-2. **Intermediate CA**: `swtpm-localca` (CN=swtpm-localca) - signs EK certificates
-3. **EK Certificate**: The TPM's endorsement key certificate
+   - Self-signed, valid for 10 years
+2. **Intermediate CA**: `swtpm-localca` (CN=swtpm-localca)
+   - Signed by root CA, used to sign EK certificates
+3. **EK Certificate**: Agent-VM's TPM endorsement key certificate
+   - Signed by intermediate CA during VM boot
 
-Both the root and intermediate CA certificates must be trusted by the Flight Control
-API server to validate these EK certificates during device enrollment.
+Both the root and intermediate CA certificates are deployed to the server, allowing it to validate the complete chain.
 
-The deployment script automatically copies both certificates from your swtpm installation.
+## Usage
 
-## Troubleshooting
+### Normal Workflow
+
+```bash
+# 1. Deploy server with TPM support (creates test CA)
+TPM=enabled make deploy
+
+# 2. Create agent-VM (uses the test CA)
+TPM=enabled make agent-vm
+
+# Agent enrolls successfully because server trusts the test CA
+```
+
+### Troubleshooting
 
 If TPM enrollment fails with "certificate signed by unknown authority":
 
-1. Check that swtpm certificates exist on your system:
+1. **Ensure consistent TPM=enabled usage**:
    ```bash
-   ls -la /var/lib/swtpm-localca/
-   # or
-   ls -la ~/.config/var/lib/swtpm-localca/
+   # Both commands must use TPM=enabled
+   TPM=enabled make deploy
+   TPM=enabled make agent-vm
    ```
 
-2. Verify the deployment found the certificates:
+2. **Check test CA was created**:
    ```bash
-   TPM=enabled make deploy-tpm-certs
-   # Look for "Found system-wide swtpm-localca" or "Found user swtpm-localca"
+   ls -la bin/swtpm-ca/
+   # Should show signkey.pem, issuercert.pem, etc.
    ```
 
-3. If you get a "WARNING: No swtpm-localca certificates found" message, your system
-   may not have swtpm configured yet. The certificates are created when swtpm first runs.
+3. **Verify CA is deployed**:
+   ```bash
+   kubectl get configmap -n flightctl-external tpm-ca-certs \
+     -o jsonpath='{.data}' | grep swtpm
+   ```
+
+4. **Clean and redeploy if needed**:
+   ```bash
+   make clean-swtpm-certs
+   TPM=enabled make deploy
+   ```
+
+## Cleanup
+
+```bash
+# Remove test CA and VM configuration
+make clean-swtpm-certs
+
+# Remove agent-VM
+make clean-agent-vm
+```
 
 ## Production Use
 
-**⚠️ WARNING:** swtpm is for testing only. DO NOT use in production.
+**⚠️ WARNING:** This test CA is for development and testing ONLY.
 
-For production environments, use real TPM hardware which will have endorsement key
-certificates signed by actual TPM manufacturer CAs (Infineon, Nuvoton, STMicroelectronics, etc.).
+For production:
+- Use real TPM hardware (not emulated swtpm)
+- Real TPMs have EK certificates signed by manufacturer CAs (Infineon, Nuvoton, STMicroelectronics, etc.)
+- Deploy actual manufacturer CA certificates to the server
+- Never use self-generated test CAs
 
-## How It's Used
+## Technical Details
 
-When `TPM=enabled` is set during deployment:
-1. The deployment script finds your system's swtpm CA certificates
-2. Copies them to `bin/tpm-cas/` along with manufacturer CAs
-3. Deploys all CAs to the Kubernetes cluster
-4. The API server can then validate EK certificates from agent VMs with emulated TPMs
+The test CA is created by `test/scripts/create-test-swtpm-ca.sh`, which:
+- Generates a 2048-bit RSA root CA
+- Generates a 2048-bit RSA intermediate CA
+- Configures proper X.509 extensions for CA usage
+- Creates the certificate chain structure expected by swtpm
+
+When `TPM=enabled make agent-vm` runs:
+- Creates temporary swtpm configuration pointing to `bin/swtpm-ca/`
+- Passes this config to virt-install via `SWTPM_LOCALCA_CONF` environment variable
+- swtpm reads the config and uses the test CA to sign the EK certificate
+- VM boots with EK certificate that the server can validate

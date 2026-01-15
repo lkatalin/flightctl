@@ -15,12 +15,37 @@ agent-vm: bin/output/qcow2/disk.qcow2 prepare-e2e-qcow-config
 else
 agent-vm: bin/output/qcow2/disk.qcow2
 endif
+ifeq ($(TPM),enabled)
+	@echo "Configuring swtpm to use test CA from bin/swtpm-ca/..."
+	@if [ ! -f bin/swtpm-ca/signkey.pem ]; then \
+		echo "ERROR: Test swtpm CA not found. Run 'TPM=enabled make deploy' first."; \
+		exit 1; \
+	fi
+	@mkdir -p bin/swtpm-vm-config
+	@SWTPM_CA_DIR=$$(realpath bin/swtpm-ca); \
+	printf "statedir = %s\nsigningkey = %s/signkey.pem\nissuercert = %s/issuercert.pem\ncertserial = %s/certserial\n" \
+		"$$SWTPM_CA_DIR" "$$SWTPM_CA_DIR" "$$SWTPM_CA_DIR" "$$SWTPM_CA_DIR" \
+		> bin/swtpm-vm-config/swtpm-localca.conf
+	@echo "✓ Created temporary swtpm configuration for VM"
+endif
 	@echo "Booting Agent VM from $(VMDISK) with disk size $(VMDISKSIZE)"
 	sudo cp bin/output/qcow2/disk.qcow2 $(VMDISK)
 	@if [ "$(VMDISKSIZE)" != "$(VMDISKSIZE_DEFAULT)" ]; then \
 		sudo qemu-img resize $(VMDISK) $(VMDISKSIZE); \
 	fi
 	sudo chown libvirt:libvirt $(VMDISK) 2>/dev/null || true
+ifeq ($(TPM),enabled)
+	@echo "⚠️  Starting VM with TEST swtpm CA (for testing only!)"
+	sudo env SWTPM_LOCALCA_CONF=$$(realpath bin/swtpm-vm-config/swtpm-localca.conf) virt-install --name $(VMNAME) \
+		--tpm backend.type=emulator,backend.version=2.0,model=tpm-tis \
+					  --vcpus $(VMCPUS) \
+					  --memory $(VMRAM) \
+					  --import --disk $(VMDISK),format=qcow2 \
+					  --os-variant fedora-eln  \
+					  --autoconsole text \
+					  --wait $(VMWAIT) \
+					  --transient || true
+else
 	sudo virt-install --name $(VMNAME) \
 		--tpm backend.type=emulator,backend.version=2.0,model=tpm-tis \
 					  --vcpus $(VMCPUS) \
@@ -30,6 +55,7 @@ endif
 					  --autoconsole text \
 					  --wait $(VMWAIT) \
 					  --transient || true
+endif
 
 
 update-vm-agent: bin/flightctl-agent
@@ -55,6 +81,7 @@ agent-vm-console:
 clean-agent-vm:
 	sudo virsh destroy $(VMNAME) || true
 	sudo rm -f $(VMDISK)
+	rm -rf bin/swtpm-vm-config
 
 .PHONY: clean-agent-vm
 

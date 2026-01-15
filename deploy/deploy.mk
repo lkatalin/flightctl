@@ -68,23 +68,13 @@ ifeq ($(TPM),enabled)
 		echo "ERROR: No TPM CA certificates found in tpm-manufacturer-certs/"; \
 		exit 1; \
 	fi
-	@echo "Looking for swtpm-localca certificates for emulated TPM testing..."
-	@if [ -f /var/lib/swtpm-localca/swtpm-localca-rootca-cert.pem ] && [ -f /var/lib/swtpm-localca/issuercert.pem ]; then \
-		echo "  Found system-wide swtpm-localca at /var/lib/swtpm-localca/ (requires sudo)"; \
-		sudo cp /var/lib/swtpm-localca/swtpm-localca-rootca-cert.pem bin/tpm-cas/; \
-		sudo cp /var/lib/swtpm-localca/issuercert.pem bin/tpm-cas/swtpm-localca-issuer-cert.pem; \
-		sudo chown $(shell id -u):$(shell id -g) bin/tpm-cas/swtpm-localca-*.pem; \
-		echo "✓ Added swtpm-localca root and intermediate CAs from system directory"; \
-	elif [ -r ~/.config/var/lib/swtpm-localca/swtpm-localca-rootca-cert.pem ] && [ -r ~/.config/var/lib/swtpm-localca/issuercert.pem ]; then \
-		echo "  Found user swtpm-localca at ~/.config/var/lib/swtpm-localca/"; \
-		cp ~/.config/var/lib/swtpm-localca/swtpm-localca-rootca-cert.pem bin/tpm-cas/; \
-		cp ~/.config/var/lib/swtpm-localca/issuercert.pem bin/tpm-cas/swtpm-localca-issuer-cert.pem; \
-		echo "✓ Added swtpm-localca root and intermediate CAs from user directory"; \
-	else \
-		echo "  WARNING: No swtpm-localca certificates found - TPM enrollment with emulated TPM will fail"; \
-		echo "  Searched: /var/lib/swtpm-localca/ and ~/.config/var/lib/swtpm-localca/"; \
-		echo "  Note: swtpm certificates are created automatically when swtpm first runs"; \
-	fi
+	@echo ""
+	@echo "Creating test swtpm CA for emulated TPM testing..."
+	@test/scripts/create-test-swtpm-ca.sh bin/swtpm-ca
+	@cp bin/swtpm-ca/swtpm-localca-rootca-cert.pem bin/tpm-cas/
+	@cp bin/swtpm-ca/issuercert.pem bin/tpm-cas/swtpm-localca-issuer-cert.pem
+	@echo "✓ Added test swtpm CA certificates to deployment"
+	@echo ""
 	NAMESPACE=flightctl-external test/scripts/add-certs-to-deployment.sh bin/tpm-cas
 else
 	@echo "TPM is disabled - skipping TPM CA certificate configuration"
