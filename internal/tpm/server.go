@@ -652,6 +652,10 @@ func verifyEKCertificateChain(ekCert *x509.Certificate, trustedRoots *x509.CertP
 		return fmt.Errorf("no EK certificate provided")
 	}
 
+	// Debug: Log EK certificate details
+	fmt.Printf("[TPM EK Verify] Verifying EK certificate: Issuer CN=%s, Subject CN=%s\n",
+		ekCert.Issuer.CommonName, ekCert.Subject.CommonName)
+
 	// basic certificate validity check
 	now := time.Now()
 	if now.Before(ekCert.NotBefore) || now.After(ekCert.NotAfter) {
@@ -676,6 +680,7 @@ func verifyEKCertificateChain(ekCert *x509.Certificate, trustedRoots *x509.CertP
 		return fmt.Errorf("chain validation failed: %w", err)
 	}
 
+	fmt.Printf("[TPM EK Verify] Successfully verified EK certificate chain\n")
 	return nil
 }
 
@@ -703,6 +708,9 @@ func LoadCAsFromPaths(paths []string) (*x509.CertPool, error) {
 			}
 			rootPool.AddCert(cert)
 			loadedCount++
+			// Debug: Log swtpm certificate CNs
+			fmt.Printf("[TPM CA Debug] Loaded certificate: Issuer CN=%s, Subject CN=%s from %s\n",
+				cert.Issuer.CommonName, cert.Subject.CommonName, certPath)
 		} else {
 			// Try as DER
 			cert, err := x509.ParseCertificate(certData)
@@ -711,6 +719,9 @@ func LoadCAsFromPaths(paths []string) (*x509.CertPool, error) {
 			}
 			rootPool.AddCert(cert)
 			loadedCount++
+			// Debug: Log swtpm certificate CNs
+			fmt.Printf("[TPM CA Debug] Loaded certificate: Issuer CN=%s, Subject CN=%s from %s\n",
+				cert.Issuer.CommonName, cert.Subject.CommonName, certPath)
 		}
 	}
 
@@ -718,6 +729,7 @@ func LoadCAsFromPaths(paths []string) (*x509.CertPool, error) {
 		return nil, fmt.Errorf("no valid CA certificates could be loaded from the provided paths")
 	}
 
+	fmt.Printf("[TPM CA Debug] Total CA certificates loaded: %d\n", loadedCount)
 	return rootPool, nil
 }
 

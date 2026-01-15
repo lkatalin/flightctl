@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"math/big"
@@ -138,6 +139,14 @@ func (c *client) MakeCSR(deviceName string, qualifyingData []byte) ([]byte, erro
 		return nil, fmt.Errorf("getting EK certificate: %w", err)
 	}
 	c.log.Tracef("[MakeCSR] Got EK certificate (%d bytes)", len(ekCert))
+
+	// Parse and log EK certificate issuer for debugging
+	if parsedEK, err := x509.ParseCertificate(ekCert); err == nil {
+		c.log.Infof("TPM EK certificate issuer: CN=%s", parsedEK.Issuer.CommonName)
+		c.log.Infof("TPM EK certificate subject: CN=%s", parsedEK.Subject.CommonName)
+	} else {
+		c.log.Warnf("Failed to parse EK certificate for debugging: %v", err)
+	}
 
 	// get LAK public key
 	c.log.Tracef("[MakeCSR] Getting LAK public key...")
