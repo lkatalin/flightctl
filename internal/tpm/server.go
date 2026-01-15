@@ -394,6 +394,11 @@ func VerifyTCGCSRChainOfTrust(csrData []byte) error {
 // VerifyTCGCSRChainOfTrustWithRoots verifies the complete chain of trust in a TCG-CSR-IDEVID
 // including validation against trusted root CAs
 func VerifyTCGCSRChainOfTrustWithRoots(csrData []byte, trustedRoots *x509.CertPool) error {
+	return VerifyTCGCSRChainOfTrustWithCerts(csrData, &CertPoolWithCerts{Pool: trustedRoots, Certs: nil})
+}
+
+// VerifyTCGCSRChainOfTrustWithCerts verifies the complete chain of trust with debug support
+func VerifyTCGCSRChainOfTrustWithCerts(csrData []byte, poolWithCerts *CertPoolWithCerts) error {
 	// Parse the TCG-CSR-IDEVID
 	parsed, err := ParseTCGCSR(csrData)
 	if err != nil {
@@ -419,8 +424,15 @@ func VerifyTCGCSRChainOfTrustWithRoots(csrData []byte, trustedRoots *x509.CertPo
 		return fmt.Errorf("failed to parse EK certificate: %w", err)
 	}
 
-	// verify EK certificate chain against trusted roots
-	if err := verifyEKCertificateChain(ekCert, trustedRoots); err != nil {
+	var trustedRoots *x509.CertPool
+	var caCerts []*x509.Certificate
+	if poolWithCerts != nil {
+		trustedRoots = poolWithCerts.Pool
+		caCerts = poolWithCerts.Certs
+	}
+
+	// verify EK certificate chain against trusted roots with debug support
+	if err := verifyEKCertificateChainWithDebug(ekCert, trustedRoots, caCerts); err != nil {
 		return fmt.Errorf("EK certificate chain validation failed: %w", err)
 	}
 
@@ -648,6 +660,11 @@ func stripSANExtensionOIDs(cert *x509.Certificate) {
 
 // verifyEKCertificateChain verifies that the EK certificate chains to a trusted root CA
 func verifyEKCertificateChain(ekCert *x509.Certificate, trustedRoots *x509.CertPool) error {
+	return verifyEKCertificateChainWithDebug(ekCert, trustedRoots, nil)
+}
+
+// verifyEKCertificateChainWithDebug verifies the EK certificate chain with additional debug info
+func verifyEKCertificateChainWithDebug(ekCert *x509.Certificate, trustedRoots *x509.CertPool, caCerts []*x509.Certificate) error {
 	if ekCert == nil {
 		return fmt.Errorf("no EK certificate provided")
 	}
@@ -677,6 +694,9 @@ func verifyEKCertificateChain(ekCert *x509.Certificate, trustedRoots *x509.CertP
 
 	_, err := ekCert.Verify(opts)
 	if err != nil {
+		// When validation fails, check if we can verify the signature independently
+		debugSignatureVerification(ekCert, caCerts)
+
 		// Include the CN of the unknown authority in the error message
 		return fmt.Errorf("chain validation failed for certificate issued by CN=%s: %w",
 			ekCert.Issuer.CommonName, err)
@@ -686,13 +706,71 @@ func verifyEKCertificateChain(ekCert *x509.Certificate, trustedRoots *x509.CertP
 	return nil
 }
 
+// debugSignatureVerification checks if the EK certificate's signature can be verified
+// against the claimed issuer certificate, to help diagnose validation failures
+func debugSignatureVerification(ekCert *x509.Certificate, caCerts []*x509.Certificate) {
+	if caCerts == nil || len(caCerts) == 0 {
+		fmt.Printf("[TPM EK Debug] Cannot perform signature verification - no CA certificates provided for debugging\n")
+		return
+	}
+
+	issuerCN := ekCert.Issuer.CommonName
+	fmt.Printf("[TPM EK Debug] Looking for issuer certificate with CN=%s to verify signature\n", issuerCN)
+
+	// Find the issuer certificate by CN
+	var issuerCert *x509.Certificate
+	for _, cert := range caCerts {
+		if cert.Subject.CommonName == issuerCN {
+			issuerCert = cert
+			fmt.Printf("[TPM EK Debug] Found issuer certificate: CN=%s\n", cert.Subject.CommonName)
+			break
+		}
+	}
+
+	if issuerCert == nil {
+		fmt.Printf("[TPM EK Debug] Could not find issuer certificate with CN=%s among %d loaded CA certificates\n",
+			issuerCN, len(caCerts))
+		return
+	}
+
+	// Verify the signature using CheckSignatureFrom
+	err := ekCert.CheckSignatureFrom(issuerCert)
+	if err != nil {
+		fmt.Printf("[TPM EK Debug] ❌ Signature verification FAILED: The EK certificate was NOT validly signed by CN=%s. Error: %v\n",
+			issuerCN, err)
+		fmt.Printf("[TPM EK Debug] This indicates the certificate was not actually signed by the claimed issuer.\n")
+	} else {
+		fmt.Printf("[TPM EK Debug] ✓ Signature verification SUCCEEDED: The EK certificate WAS validly signed by CN=%s\n", issuerCN)
+		fmt.Printf("[TPM EK Debug] The signature is valid, so chain validation failed for a different reason (e.g., time validity, missing intermediate CA, key usage, etc.)\n")
+	}
+}
+
+// CertPoolWithCerts holds both a CertPool and the individual certificates for debugging
+type CertPoolWithCerts struct {
+	Pool  *x509.CertPool
+	Certs []*x509.Certificate
+}
+
 // LoadCAsFromPaths loads CA certificates from a list of file paths
 func LoadCAsFromPaths(paths []string) (*x509.CertPool, error) {
+	poolWithCerts, err := LoadCAsFromPathsWithDetails(paths)
+	if err != nil {
+		return nil, err
+	}
+	if poolWithCerts == nil {
+		return nil, nil
+	}
+	return poolWithCerts.Pool, nil
+}
+
+// LoadCAsFromPathsWithDetails loads CA certificates and returns both pool and individual certs
+func LoadCAsFromPathsWithDetails(paths []string) (*CertPoolWithCerts, error) {
 	if len(paths) == 0 {
 		return nil, nil
 	}
 
 	rootPool := x509.NewCertPool()
+	var certs []*x509.Certificate
 	loadedCount := 0
 
 	for _, certPath := range paths {
@@ -709,6 +787,7 @@ func LoadCAsFromPaths(paths []string) (*x509.CertPool, error) {
 				continue
 			}
 			rootPool.AddCert(cert)
+			certs = append(certs, cert)
 			loadedCount++
 			// Debug: Log swtpm certificate CNs
 			fmt.Printf("[TPM CA Debug] Loaded certificate: Issuer CN=%s, Subject CN=%s from %s\n",
@@ -720,6 +799,7 @@ func LoadCAsFromPaths(paths []string) (*x509.CertPool, error) {
 				continue
 			}
 			rootPool.AddCert(cert)
+			certs = append(certs, cert)
 			loadedCount++
 			// Debug: Log swtpm certificate CNs
 			fmt.Printf("[TPM CA Debug] Loaded certificate: Issuer CN=%s, Subject CN=%s from %s\n",
@@ -732,7 +812,7 @@ func LoadCAsFromPaths(paths []string) (*x509.CertPool, error) {
 	}
 
 	fmt.Printf("[TPM CA Debug] Total CA certificates loaded: %d\n", loadedCount)
-	return rootPool, nil
+	return &CertPoolWithCerts{Pool: rootPool, Certs: certs}, nil
 }
 
 // ParseTCGCSRBytes returns the decoded TCG-formatted CSR bytes if valid, or false if not.

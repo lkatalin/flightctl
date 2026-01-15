@@ -27,17 +27,26 @@ import (
 
 // getTPMCAPool loads the TPM CA certificates from configured paths
 func (h *ServiceHandler) getTPMCAPool() *x509.CertPool {
+	poolWithCerts := h.getTPMCAPoolWithCerts()
+	if poolWithCerts == nil {
+		return nil
+	}
+	return poolWithCerts.Pool
+}
+
+// getTPMCAPoolWithCerts loads TPM CA certificates with detailed certificate information
+func (h *ServiceHandler) getTPMCAPoolWithCerts() *tpm.CertPoolWithCerts {
 	if len(h.tpmCAPaths) == 0 {
 		return nil
 	}
 
-	roots, err := tpm.LoadCAsFromPaths(h.tpmCAPaths)
+	poolWithCerts, err := tpm.LoadCAsFromPathsWithDetails(h.tpmCAPaths)
 	if err != nil {
 		h.log.Warnf("Failed to load TPM CA certificates from configured paths: %v", err)
 		return nil
 	}
 
-	return roots
+	return poolWithCerts
 }
 
 func (h *ServiceHandler) verifyTPMEnrollmentRequest(er *api.EnrollmentRequest, name string) error {
@@ -46,12 +55,12 @@ func (h *ServiceHandler) verifyTPMEnrollmentRequest(er *api.EnrollmentRequest, n
 		return fmt.Errorf("failed to parse TCG CSR")
 	}
 
-	trustedRoots := h.getTPMCAPool()
+	poolWithCerts := h.getTPMCAPoolWithCerts()
 	condition := api.Condition{
 		Type:   api.ConditionTypeEnrollmentRequestTPMVerified,
 		Status: api.ConditionStatusFalse,
 	}
-	if err := tpm.VerifyTCGCSRChainOfTrustWithRoots(csrBytes, trustedRoots); err != nil {
+	if err := tpm.VerifyTCGCSRChainOfTrustWithCerts(csrBytes, poolWithCerts); err != nil {
 		condition.Reason = api.TPMVerificationFailedReason
 		condition.Message = err.Error()
 		h.log.Warnf("TPM verification failed for enrollment request %s: %v", name, err)
