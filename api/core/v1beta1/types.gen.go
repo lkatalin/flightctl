@@ -659,6 +659,30 @@ type ApplicationVolumeStatus struct {
 // ApplicationsSummaryStatusType Status of all applications on the device.
 type ApplicationsSummaryStatusType string
 
+// AttestationData AttestationData contains TPM attestation evidence for device enrollment verification.
+type AttestationData struct {
+	// HashAlg Hash algorithm used by the TPM (e.g., "sha256").
+	HashAlg *string `json:"hashAlg,omitempty"`
+
+	// ImaMeasurementList ASCII content from /sys/kernel/security/ima/ascii_runtime_measurements (optional).
+	ImaMeasurementList *string `json:"imaMeasurementList,omitempty"`
+
+	// MbLog Base64-encoded measured boot binary log (optional).
+	MbLog *string `json:"mbLog,omitempty"`
+
+	// Nonce Nonce used in the TPM quote for freshness.
+	Nonce *string `json:"nonce,omitempty"`
+
+	// Quote Base64-encoded TPM quote containing PCR values.
+	Quote *string `json:"quote,omitempty"`
+
+	// TpmAk Base64-encoded TPM Attestation Key public key.
+	TpmAk *string `json:"tpmAk,omitempty"`
+
+	// TpmEk Base64-encoded TPM Endorsement Key public key.
+	TpmEk *string `json:"tpmEk,omitempty"`
+}
+
 // AuthConfig defines model for AuthConfig.
 type AuthConfig struct {
 	// ApiVersion APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
@@ -1506,6 +1530,9 @@ type EnrollmentRequestList struct {
 
 // EnrollmentRequestSpec EnrollmentRequestSpec is a description of a EnrollmentRequest's target state.
 type EnrollmentRequestSpec struct {
+	// AttestationData AttestationData contains TPM attestation evidence for device enrollment verification.
+	AttestationData *AttestationData `json:"attestationData,omitempty"`
+
 	// Csr The PEM-encoded PKCS#10 certificate signing request.
 	Csr string `json:"csr"`
 

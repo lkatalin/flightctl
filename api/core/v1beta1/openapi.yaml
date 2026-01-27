@@ -5857,7 +5857,34 @@ components:
         knownRenderedVersion:
           type: string
           description: 'The rendered version of the device from desired.json (optional).'
+        attestationData:
+          $ref: '#/components/schemas/AttestationData'
       description: EnrollmentRequestSpec is a description of a EnrollmentRequest's target state.
+    AttestationData:
+      type: object
+      description: AttestationData contains TPM attestation evidence for device enrollment verification.
+      properties:
+        quote:
+          type: string
+          description: 'Base64-encoded TPM quote containing PCR values.'
+        nonce:
+          type: string
+          description: 'Nonce used in the TPM quote for freshness.'
+        hashAlg:
+          type: string
+          description: 'Hash algorithm used by the TPM (e.g., "sha256").'
+        tpmAk:
+          type: string
+          description: 'Base64-encoded TPM Attestation Key public key.'
+        tpmEk:
+          type: string
+          description: 'Base64-encoded TPM Endorsement Key public key.'
+        imaMeasurementList:
+          type: string
+          description: 'ASCII content from /sys/kernel/security/ima/ascii_runtime_measurements (optional).'
+        mbLog:
+          type: string
+          description: 'Base64-encoded measured boot binary log (optional).'
     EnrollmentRequestStatus:
       type: object
       properties:

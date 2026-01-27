@@ -10,6 +10,7 @@ import (
 	"github.com/flightctl/flightctl/internal/agent/client"
 	"github.com/flightctl/flightctl/internal/agent/device/fileio"
 	baseclient "github.com/flightctl/flightctl/internal/client"
+	"github.com/flightctl/flightctl/internal/tpm"
 	fccrypto "github.com/flightctl/flightctl/pkg/crypto"
 	"github.com/flightctl/flightctl/pkg/log"
 	"k8s.io/client-go/util/cert"
@@ -236,4 +237,14 @@ func (f *fileProvider) WipeCertificateOnly() error {
 func (f *fileProvider) Close(_ context.Context) error {
 	// no-op for file provider
 	return nil
+}
+
+// IsAttestationEnabled returns false for file-based provider (no TPM available)
+func (f *fileProvider) IsAttestationEnabled() bool {
+	return false
+}
+
+// GetTPMClient returns an error for file-based provider (no TPM available)
+func (f *fileProvider) GetTPMClient() (tpm.Client, error) {
+	return nil, fmt.Errorf("TPM client not available for file-based identity provider")
 }

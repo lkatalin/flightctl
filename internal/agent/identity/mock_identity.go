@@ -17,6 +17,7 @@ import (
 	grpc_v1 "github.com/flightctl/flightctl/api/grpc/v1"
 	client "github.com/flightctl/flightctl/internal/agent/client"
 	client0 "github.com/flightctl/flightctl/internal/client"
+	tpm "github.com/flightctl/flightctl/internal/tpm"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -156,6 +157,21 @@ func (mr *MockProviderMockRecorder) GetDeviceName() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeviceName", reflect.TypeOf((*MockProvider)(nil).GetDeviceName))
 }
 
+// GetTPMClient mocks base method.
+func (m *MockProvider) GetTPMClient() (tpm.Client, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTPMClient")
+	ret0, _ := ret[0].(tpm.Client)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetTPMClient indicates an expected call of GetTPMClient.
+func (mr *MockProviderMockRecorder) GetTPMClient() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTPMClient", reflect.TypeOf((*MockProvider)(nil).GetTPMClient))
+}
+
 // HasCertificate mocks base method.
 func (m *MockProvider) HasCertificate() bool {
 	m.ctrl.T.Helper()
@@ -182,6 +198,20 @@ func (m *MockProvider) Initialize(ctx context.Context) error {
 func (mr *MockProviderMockRecorder) Initialize(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockProvider)(nil).Initialize), ctx)
+}
+
+// IsAttestationEnabled mocks base method.
+func (m *MockProvider) IsAttestationEnabled() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsAttestationEnabled")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsAttestationEnabled indicates an expected call of IsAttestationEnabled.
+func (mr *MockProviderMockRecorder) IsAttestationEnabled() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsAttestationEnabled", reflect.TypeOf((*MockProvider)(nil).IsAttestationEnabled))
 }
 
 // ProveIdentity mocks base method.

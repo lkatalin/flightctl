@@ -29,6 +29,14 @@ type Client interface {
 	VendorInfoCollector(ctx context.Context) string
 	// CreateApplicationKey generates a TCG CSR IDEVID bundle and a TSS2 PEM encoded file for the specified application
 	CreateApplicationKey(name string) ([]byte, []byte, error)
+	// GenerateQuote generates a TPM quote with PCR values using the LAK
+	GenerateQuote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (quote []byte, signature []byte, pcrs []byte, err error)
+	// GetAKPublic returns the LAK (Attestation Key) public key in marshaled TPM2B format
+	GetAKPublic() ([]byte, error)
+	// GetEKPublic returns the EK (Endorsement Key) public key in marshaled TPM2B format
+	GetEKPublic() ([]byte, error)
+	// GetHashAlgorithm returns the hash algorithm used by the TPM
+	GetHashAlgorithm() string
 }
 
 const (
@@ -146,6 +154,10 @@ type Session interface {
 	GenerateChallenge(secret []byte) ([]byte, []byte, error)
 	// SolveChallenge decrypts the encryptedSecret to prove ownership of the credentials
 	SolveChallenge(credentialBlob, encryptedSecret []byte) ([]byte, error)
+	// Quote generates a TPM quote with PCR values
+	Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (quote []byte, signature []byte, pcrs []byte, err error)
+	// GetEndorsementKeyPublic returns the endorsement key public blob
+	GetEndorsementKeyPublic() ([]byte, error)
 	// Clear performs a best-effort clear of the TPM, resetting keys and auth
 	Clear() error
 	// Close closes the session and flushes handles

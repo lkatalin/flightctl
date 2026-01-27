@@ -534,3 +534,16 @@ func (t *tpmProvider) WipeCertificateOnly() error {
 	t.log.Info("Successfully wiped certificate file")
 	return nil
 }
+
+// IsAttestationEnabled returns true if attestation is enabled in the config
+func (t *tpmProvider) IsAttestationEnabled() bool {
+	return t.config.TPM.AttestationEnabled
+}
+
+// GetTPMClient returns the TPM client
+func (t *tpmProvider) GetTPMClient() (tpm.Client, error) {
+	if t.client == nil {
+		return nil, fmt.Errorf("TPM client not initialized")
+	}
+	return t.client, nil
+}

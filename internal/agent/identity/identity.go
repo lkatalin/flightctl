@@ -92,6 +92,10 @@ type Provider interface {
 	WipeCredentials() error
 	// WipeCertificateOnly securely removes only the certificate (not keys or CSR)
 	WipeCertificateOnly() error
+	// IsAttestationEnabled returns true if attestation is enabled
+	IsAttestationEnabled() bool
+	// GetTPMClient returns the TPM client if available
+	GetTPMClient() (tpm.Client, error)
 }
 
 // NewProvider creates an identity provider

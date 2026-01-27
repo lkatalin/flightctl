@@ -86,6 +86,67 @@ func (mr *MockClientMockRecorder) CreateApplicationKey(name any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateApplicationKey", reflect.TypeOf((*MockClient)(nil).CreateApplicationKey), name)
 }
 
+// GenerateQuote mocks base method.
+func (m *MockClient) GenerateQuote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) ([]byte, []byte, []byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GenerateQuote", nonce, pcrSelection)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].([]byte)
+	ret2, _ := ret[2].([]byte)
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
+}
+
+// GenerateQuote indicates an expected call of GenerateQuote.
+func (mr *MockClientMockRecorder) GenerateQuote(nonce, pcrSelection any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateQuote", reflect.TypeOf((*MockClient)(nil).GenerateQuote), nonce, pcrSelection)
+}
+
+// GetAKPublic mocks base method.
+func (m *MockClient) GetAKPublic() ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAKPublic")
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAKPublic indicates an expected call of GetAKPublic.
+func (mr *MockClientMockRecorder) GetAKPublic() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAKPublic", reflect.TypeOf((*MockClient)(nil).GetAKPublic))
+}
+
+// GetEKPublic mocks base method.
+func (m *MockClient) GetEKPublic() ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEKPublic")
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEKPublic indicates an expected call of GetEKPublic.
+func (mr *MockClientMockRecorder) GetEKPublic() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEKPublic", reflect.TypeOf((*MockClient)(nil).GetEKPublic))
+}
+
+// GetHashAlgorithm mocks base method.
+func (m *MockClient) GetHashAlgorithm() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetHashAlgorithm")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetHashAlgorithm indicates an expected call of GetHashAlgorithm.
+func (mr *MockClientMockRecorder) GetHashAlgorithm() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHashAlgorithm", reflect.TypeOf((*MockClient)(nil).GetHashAlgorithm))
+}
+
 // GetSigner mocks base method.
 func (m *MockClient) GetSigner() crypto.Signer {
 	m.ctrl.T.Helper()
@@ -722,6 +783,21 @@ func (mr *MockSessionMockRecorder) GetEndorsementKeyCert() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEndorsementKeyCert", reflect.TypeOf((*MockSession)(nil).GetEndorsementKeyCert))
 }
 
+// GetEndorsementKeyPublic mocks base method.
+func (m *MockSession) GetEndorsementKeyPublic() ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEndorsementKeyPublic")
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEndorsementKeyPublic indicates an expected call of GetEndorsementKeyPublic.
+func (mr *MockSessionMockRecorder) GetEndorsementKeyPublic() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEndorsementKeyPublic", reflect.TypeOf((*MockSession)(nil).GetEndorsementKeyPublic))
+}
+
 // GetPublicKey mocks base method.
 func (m *MockSession) GetPublicKey(keyType KeyType) (*tpm2.TPM2BPublic, error) {
 	m.ctrl.T.Helper()
@@ -765,6 +841,23 @@ func (m *MockSession) LoadKey(keyType KeyType) (*tpm2.NamedHandle, error) {
 func (mr *MockSessionMockRecorder) LoadKey(keyType any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadKey", reflect.TypeOf((*MockSession)(nil).LoadKey), keyType)
+}
+
+// Quote mocks base method.
+func (m *MockSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) ([]byte, []byte, []byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Quote", nonce, pcrSelection)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].([]byte)
+	ret2, _ := ret[2].([]byte)
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
+}
+
+// Quote indicates an expected call of Quote.
+func (mr *MockSessionMockRecorder) Quote(nonce, pcrSelection any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Quote", reflect.TypeOf((*MockSession)(nil).Quote), nonce, pcrSelection)
 }
 
 // RemoveApplicationKey mocks base method.
