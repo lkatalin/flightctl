@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -402,6 +403,19 @@ func (m *LifecycleManager) enrollmentRequest(ctx context.Context, deviceStatus *
 		m.log.Debugf("Failed to read desired.json: %v", err)
 	}
 
+	// Collect attestation data if enabled
+	var attestationData *v1beta1.AttestationData
+	if m.identityProvider.IsAttestationEnabled() {
+		m.log.Info("Attestation enabled, collecting TPM quote and measurements")
+		var err error
+		attestationData, err = m.collectAttestationData(ctx)
+		if err != nil {
+			m.log.Warnf("Failed to collect attestation data: %v", err)
+			// Continue without attestation data if collection fails
+			attestationData = nil
+		}
+	}
+
 	req := v1beta1.EnrollmentRequest{
 		ApiVersion: "v1beta1",
 		Kind:       "EnrollmentRequest",
@@ -413,6 +427,7 @@ func (m *LifecycleManager) enrollmentRequest(ctx context.Context, deviceStatus *
 			DeviceStatus:         deviceStatus,
 			Labels:               &m.defaultLabels,
 			KnownRenderedVersion: knownRenderedVersion,
+			AttestationData:      attestationData,
 		},
 	}
 
@@ -429,4 +444,87 @@ func (m *LifecycleManager) enrollmentRequest(ctx context.Context, deviceStatus *
 	}
 
 	return nil
+}
+
+// collectAttestationData collects TPM attestation data for enrollment
+func (m *LifecycleManager) collectAttestationData(ctx context.Context) (*v1beta1.AttestationData, error) {
+	tpmClient, err := m.identityProvider.GetTPMClient()
+	if err != nil {
+		return nil, fmt.Errorf("getting TPM client: %w", err)
+	}
+	if tpmClient == nil {
+		return nil, fmt.Errorf("TPM client is nil")
+	}
+
+	// Generate a nonce for the quote (20 bytes as per Keylime spec)
+	nonce := make([]byte, 20)
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, fmt.Errorf("generating nonce: %w", err)
+	}
+
+	// Generate TPM quote with PCR values
+	quote, signature, pcrs, err := tpmClient.GenerateQuote(nonce, nil)
+	if err != nil {
+		return nil, fmt.Errorf("generating TPM quote: %w", err)
+	}
+
+	// Get TPM keys
+	akPublic, err := tpmClient.GetAKPublic()
+	if err != nil {
+		return nil, fmt.Errorf("getting AK public key: %w", err)
+	}
+
+	ekPublic, err := tpmClient.GetEKPublic()
+	if err != nil {
+		return nil, fmt.Errorf("getting EK public key: %w", err)
+	}
+
+	// Combine quote, signature, and PCRs for transmission
+	// Format: base64(quote:signature:pcrs)
+	combinedQuote := fmt.Sprintf("%s:%s:%s",
+		base64.StdEncoding.EncodeToString(quote),
+		base64.StdEncoding.EncodeToString(signature),
+		base64.StdEncoding.EncodeToString(pcrs))
+
+	// Read IMA measurements if available
+	imaMeasurements, err := tpm.ReadIMAMeasurements(m.deviceReadWriter)
+	if err != nil {
+		m.log.Warnf("Failed to read IMA measurements: %v", err)
+		imaMeasurements = ""
+	}
+
+	// Read measured boot log if available
+	mbLog, err := tpm.ReadMeasuredBootLog(m.deviceReadWriter)
+	if err != nil {
+		m.log.Warnf("Failed to read measured boot log: %v", err)
+		mbLog = nil
+	}
+
+	// Prepare attestation data
+	hashAlg := tpmClient.GetHashAlgorithm()
+	nonceStr := base64.StdEncoding.EncodeToString(nonce)
+	akStr := base64.StdEncoding.EncodeToString(akPublic)
+	ekStr := base64.StdEncoding.EncodeToString(ekPublic)
+
+	attestation := &v1beta1.AttestationData{
+		Quote:   &combinedQuote,
+		Nonce:   &nonceStr,
+		HashAlg: &hashAlg,
+		TpmAk:   &akStr,
+		TpmEk:   &ekStr,
+	}
+
+	if imaMeasurements != "" {
+		attestation.ImaMeasurementList = &imaMeasurements
+	}
+
+	if mbLog != nil {
+		mbLogStr := base64.StdEncoding.EncodeToString(mbLog)
+		attestation.MbLog = &mbLogStr
+	}
+
+	m.log.Infof("Collected attestation data: quote=%d bytes, AK=%d bytes, EK=%d bytes, IMA=%d bytes, MB=%d bytes",
+		len(combinedQuote), len(akStr), len(ekStr), len(imaMeasurements), len(mbLog))
+
+	return attestation, nil
 }

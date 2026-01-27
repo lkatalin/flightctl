@@ -359,6 +359,35 @@ func (c *client) SolveChallenge(credentialBlob, encryptedSecret []byte) ([]byte,
 	return c.session.SolveChallenge(credentialBlob, encryptedSecret)
 }
 
+// GenerateQuote generates a TPM quote with PCR values using the LAK.
+// If pcrSelection is nil, it defaults to all PCRs (0-23).
+func (c *client) GenerateQuote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (quote []byte, signature []byte, pcrs []byte, err error) {
+	if pcrSelection == nil {
+		pcrSelection = createFullPCRSelection()
+	}
+	return c.session.Quote(nonce, pcrSelection)
+}
+
+// GetAKPublic returns the LAK (Attestation Key) public key in marshaled TPM2B format
+func (c *client) GetAKPublic() ([]byte, error) {
+	lakPub, err := c.session.GetPublicKey(LAK)
+	if err != nil {
+		return nil, fmt.Errorf("getting LAK public key: %w", err)
+	}
+	return tpm2.Marshal(*lakPub), nil
+}
+
+// GetEKPublic returns the EK (Endorsement Key) public key in marshaled TPM2B format
+func (c *client) GetEKPublic() ([]byte, error) {
+	return c.session.GetEndorsementKeyPublic()
+}
+
+// GetHashAlgorithm returns the hash algorithm used by the TPM
+func (c *client) GetHashAlgorithm() string {
+	// Currently hardcoded to SHA256, but could be made configurable in the future
+	return "sha256"
+}
+
 // convertTPM2BPublicToECDSA converts a TPM2BPublic to a public key.
 func convertTPM2BPublicToPublicKey(pub *tpm2.TPM2BPublic) (crypto.PublicKey, error) {
 	outpub, err := pub.Contents()

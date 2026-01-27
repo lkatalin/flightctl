@@ -1288,3 +1288,150 @@ func (s *tpmSession) RemoveApplicationKey(appName string) error {
 	}
 	return nil
 }
+
+// Quote generates a TPM quote with PCR values using the LAK
+func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (quote []byte, signature []byte, pcrs []byte, err error) {
+	// Load LAK if not already loaded
+	lakHandle, err := s.LoadKey(LAK)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("loading LAK: %w", err)
+	}
+
+	// Create qualifying data from nonce
+	qualifyingData := tpm2.TPM2BData{
+		Buffer: nonce,
+	}
+
+	// Execute TPM2_Quote command
+	quoteCmd := tpm2.Quote{
+		SignHandle: tpm2.AuthHandle{
+			Handle: lakHandle.Handle,
+			Name:   lakHandle.Name,
+			Auth:   tpm2.PasswordAuth(nil),
+		},
+		QualifyingData: qualifyingData,
+		PCRSelect:      *pcrSelection,
+		InScheme: tpm2.TPMTSigScheme{
+			Scheme: tpm2.TPMAlgECDSA,
+			Details: tpm2.NewTPMUSigScheme(
+				tpm2.TPMAlgECDSA,
+				&tpm2.TPMSSchemeHash{
+					HashAlg: tpm2.TPMAlgSHA256,
+				},
+			),
+		},
+	}
+
+	quoteRsp, err := quoteCmd.Execute(transport.FromReadWriter(s.conn))
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("executing TPM2_Quote: %w", err)
+	}
+
+	// Marshal the quote and signature
+	quoteMarshal := tpm2.Marshal(quoteRsp.Quoted)
+	signatureMarshal := tpm2.Marshal(quoteRsp.Signature)
+
+	// Read PCR values
+	pcrReadCmd := tpm2.PCRRead{
+		PCRSelectionIn: *pcrSelection,
+	}
+
+	pcrReadRsp, err := pcrReadCmd.Execute(transport.FromReadWriter(s.conn))
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("reading PCRs: %w", err)
+	}
+
+	// Marshal PCR values
+	pcrMarshal := tpm2.Marshal(pcrReadRsp.PCRValues)
+
+	return quoteMarshal, signatureMarshal, pcrMarshal, nil
+}
+
+// GetEndorsementKeyPublic returns the endorsement key public blob
+func (s *tpmSession) GetEndorsementKeyPublic() ([]byte, error) {
+	// Create EK handle
+	ekHandle := tpm2.TPMHandle(0x81010001)
+
+	// Try to read the public portion of the EK
+	readPubCmd := tpm2.ReadPublic{
+		ObjectHandle: ekHandle,
+	}
+
+	readPubRsp, err := readPubCmd.Execute(transport.FromReadWriter(s.conn))
+	if err != nil {
+		// If EK doesn't exist, try to create it
+		s.log.Debugf("EK not found at handle 0x%x, attempting to create: %v", ekHandle, err)
+		if err := s.createEK(); err != nil {
+			return nil, fmt.Errorf("creating EK: %w", err)
+		}
+
+		// Try reading again
+		readPubRsp, err = readPubCmd.Execute(transport.FromReadWriter(s.conn))
+		if err != nil {
+			return nil, fmt.Errorf("reading EK public after creation: %w", err)
+		}
+	}
+
+	return tpm2.Marshal(readPubRsp.OutPublic), nil
+}
+
+// createEK creates an endorsement key if it doesn't exist
+func (s *tpmSession) createEK() error {
+	ekTemplate := tpm2.TPMTPublic{
+		Type:    tpm2.TPMAlgRSA,
+		NameAlg: tpm2.TPMAlgSHA256,
+		ObjectAttributes: tpm2.TPMAObject{
+			FixedTPM:             true,
+			STClear:              false,
+			FixedParent:          true,
+			SensitiveDataOrigin:  true,
+			UserWithAuth:         false,
+			AdminWithPolicy:      true,
+			NoDA:                 true,
+			EncryptedDuplication: false,
+			Restricted:           true,
+			Decrypt:              true,
+			SignEncrypt:          false,
+		},
+		Parameters: tpm2.NewTPMUPublicParms(
+			tpm2.TPMAlgRSA,
+			&tpm2.TPMSRSAParms{
+				Scheme: tpm2.TPMTRSAScheme{
+					Scheme: tpm2.TPMAlgNull,
+				},
+				KeyBits: 2048,
+			},
+		),
+	}
+
+	createPrimaryCmd := tpm2.CreatePrimary{
+		PrimaryHandle: tpm2.TPMRHEndorsement,
+		InPublic:      tpm2.New2B(ekTemplate),
+	}
+
+	createPrimaryRsp, err := createPrimaryCmd.Execute(transport.FromReadWriter(s.conn))
+	if err != nil {
+		return fmt.Errorf("creating EK primary: %w", err)
+	}
+
+	// Make the EK persistent
+	ekHandle := tpm2.TPMHandle(0x81010001)
+	evictCmd := tpm2.EvictControl{
+		Auth: tpm2.TPMRHOwner,
+		ObjectHandle: &tpm2.NamedHandle{
+			Handle: createPrimaryRsp.ObjectHandle,
+			Name:   createPrimaryRsp.Name,
+		},
+		PersistentHandle: ekHandle,
+	}
+
+	_, err = evictCmd.Execute(transport.FromReadWriter(s.conn))
+	if err != nil {
+		// Flush the transient handle before returning error
+		_ = s.flushHandle(createPrimaryRsp.ObjectHandle)
+		return fmt.Errorf("making EK persistent: %w", err)
+	}
+
+	s.log.Infof("Created and persisted EK at handle 0x%x", ekHandle)
+	return nil
+}
