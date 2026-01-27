@@ -309,3 +309,98 @@ func TestTPMProvider_NewExportable(t *testing.T) {
 		})
 	}
 }
+
+func TestTPMProvider_IsAttestationEnabled(t *testing.T) {
+	tests := []struct {
+		name           string
+		config         *agent_config.Config
+		expectedResult bool
+	}{
+		{
+			name: "attestation enabled",
+			config: &agent_config.Config{
+				TPM: agent_config.TPM{
+					Enabled:            true,
+					AttestationEnabled: true,
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "attestation disabled",
+			config: &agent_config.Config{
+				TPM: agent_config.TPM{
+					Enabled:            true,
+					AttestationEnabled: false,
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "attestation not specified (default false)",
+			config: &agent_config.Config{
+				TPM: agent_config.TPM{
+					Enabled: true,
+				},
+			},
+			expectedResult: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &tpmProvider{
+				config: tt.config,
+				log:    log.NewPrefixLogger("test"),
+			}
+
+			result := provider.IsAttestationEnabled()
+			require.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
+
+func TestTPMProvider_GetTPMClient(t *testing.T) {
+	tests := []struct {
+		name               string
+		client             tpm.Client
+		expectError        bool
+		expectedErrMessage string
+	}{
+		{
+			name:        "success with initialized client",
+			client:      tpm.NewMockClient(gomock.NewController(t)),
+			expectError: false,
+		},
+		{
+			name:               "error when client not initialized",
+			client:             nil,
+			expectError:        true,
+			expectedErrMessage: "TPM client not initialized",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &tpmProvider{
+				client: tt.client,
+				config: agent_config.NewDefault(),
+				log:    log.NewPrefixLogger("test"),
+			}
+
+			result, err := provider.GetTPMClient()
+
+			if tt.expectError {
+				require.Error(t, err)
+				require.Nil(t, result)
+				if tt.expectedErrMessage != "" {
+					require.Contains(t, err.Error(), tt.expectedErrMessage)
+				}
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				require.Equal(t, tt.client, result)
+			}
+		})
+	}
+}
