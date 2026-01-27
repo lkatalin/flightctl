@@ -158,6 +158,8 @@ type TPM struct {
 	AuthEnabled bool `json:"auth-enabled,omitempty"`
 	// StorageFilePath specifies the file path for TPM key storage.
 	StorageFilePath string `json:"storage-file-path,omitempty"`
+	// AttestationEnabled indicates whether to collect and send TPM attestation data during enrollment.
+	AttestationEnabled bool `json:"attestation-enabled,omitempty"`
 }
 
 type ImagePruning struct {
@@ -456,6 +458,7 @@ func mergeConfigs(base, override *Config) {
 	overrideIfNotEmpty(&base.TPM.AuthEnabled, override.TPM.AuthEnabled)
 	overrideIfNotEmpty(&base.TPM.DevicePath, override.TPM.DevicePath)
 	overrideIfNotEmpty(&base.TPM.StorageFilePath, override.TPM.StorageFilePath)
+	overrideIfNotEmpty(&base.TPM.AttestationEnabled, override.TPM.AttestationEnabled)
 
 	// audit log
 	overrideIfNotEmpty(&base.AuditLog.Enabled, override.AuditLog.Enabled)
