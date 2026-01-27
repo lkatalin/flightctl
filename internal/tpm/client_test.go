@@ -1579,6 +1579,207 @@ func TestClient_CreateApplicationKeys(t *testing.T) {
 	}
 }
 
+func TestClient_GenerateQuote(t *testing.T) {
+	nonce := []byte("test-nonce-12345")
+	quote := []byte("test-quote")
+	signature := []byte("test-signature")
+	pcrs := []byte("test-pcrs")
+
+	testCases := []struct {
+		name         string
+		pcrSelection *tpm2.TPMLPCRSelection
+		setupMocks   func(*MockSession)
+		expectError  bool
+		errorMsg     string
+	}{
+		{
+			name:         "successful quote with default PCR selection",
+			pcrSelection: nil,
+			setupMocks: func(mockSession *MockSession) {
+				// When pcrSelection is nil, createFullPCRSelection() is called
+				mockSession.EXPECT().Quote(nonce, gomock.Any()).Return(quote, signature, pcrs, nil)
+			},
+			expectError: false,
+		},
+		{
+			name: "successful quote with custom PCR selection",
+			pcrSelection: &tpm2.TPMLPCRSelection{
+				PCRSelections: []tpm2.TPMSPCRSelection{
+					{
+						Hash:      tpm2.TPMAlgSHA256,
+						PCRSelect: tpm2.PCClientCompatible.PCRs(0, 1, 2),
+					},
+				},
+			},
+			setupMocks: func(mockSession *MockSession) {
+				mockSession.EXPECT().Quote(nonce, gomock.Any()).Return(quote, signature, pcrs, nil)
+			},
+			expectError: false,
+		},
+		{
+			name:         "session Quote fails",
+			pcrSelection: nil,
+			setupMocks: func(mockSession *MockSession) {
+				mockSession.EXPECT().Quote(nonce, gomock.Any()).Return(nil, nil, nil, errors.New("TPM quote error"))
+			},
+			expectError: true,
+			errorMsg:    "TPM quote error",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockSession := NewMockSession(ctrl)
+			logger := log.NewPrefixLogger("test")
+
+			tc.setupMocks(mockSession)
+
+			c := &client{
+				session: mockSession,
+				log:     logger,
+			}
+
+			resultQuote, resultSig, resultPcrs, err := c.GenerateQuote(nonce, tc.pcrSelection)
+
+			if tc.expectError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errorMsg)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, quote, resultQuote)
+				require.Equal(t, signature, resultSig)
+				require.Equal(t, pcrs, resultPcrs)
+			}
+		})
+	}
+}
+
+func TestClient_GetAKPublic(t *testing.T) {
+	testCases := []struct {
+		name        string
+		setupMocks  func(*MockSession)
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "successful AK public key retrieval",
+			setupMocks: func(mockSession *MockSession) {
+				pub := createTestTPM2BPublic(t)
+				mockSession.EXPECT().GetPublicKey(LAK).Return(pub, nil)
+			},
+			expectError: false,
+		},
+		{
+			name: "session GetPublicKey fails",
+			setupMocks: func(mockSession *MockSession) {
+				mockSession.EXPECT().GetPublicKey(LAK).Return(nil, errors.New("failed to get LAK public key"))
+			},
+			expectError: true,
+			errorMsg:    "getting LAK public key",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockSession := NewMockSession(ctrl)
+			logger := log.NewPrefixLogger("test")
+
+			tc.setupMocks(mockSession)
+
+			c := &client{
+				session: mockSession,
+				log:     logger,
+			}
+
+			result, err := c.GetAKPublic()
+
+			if tc.expectError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errorMsg)
+			} else {
+				require.NoError(t, err)
+				require.NotEmpty(t, result)
+			}
+		})
+	}
+}
+
+func TestClient_GetEKPublic(t *testing.T) {
+	ekPublic := []byte("test-ek-public")
+
+	testCases := []struct {
+		name        string
+		setupMocks  func(*MockSession)
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "successful EK public key retrieval",
+			setupMocks: func(mockSession *MockSession) {
+				mockSession.EXPECT().GetEndorsementKeyPublic().Return(ekPublic, nil)
+			},
+			expectError: false,
+		},
+		{
+			name: "session GetEndorsementKeyPublic fails",
+			setupMocks: func(mockSession *MockSession) {
+				mockSession.EXPECT().GetEndorsementKeyPublic().Return(nil, errors.New("failed to get EK public key"))
+			},
+			expectError: true,
+			errorMsg:    "failed to get EK public key",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockSession := NewMockSession(ctrl)
+			logger := log.NewPrefixLogger("test")
+
+			tc.setupMocks(mockSession)
+
+			c := &client{
+				session: mockSession,
+				log:     logger,
+			}
+
+			result, err := c.GetEKPublic()
+
+			if tc.expectError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errorMsg)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, ekPublic, result)
+			}
+		})
+	}
+}
+
+func TestClient_GetHashAlgorithm(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSession := NewMockSession(ctrl)
+	logger := log.NewPrefixLogger("test")
+
+	c := &client{
+		session: mockSession,
+		log:     logger,
+	}
+
+	result := c.GetHashAlgorithm()
+	require.Equal(t, "sha256", result)
+}
+
 // closes the session in a way that doesn't close the underlying connection so that it can be reused
 // for a testing purposes
 func safeCloseSession(session Session) error {

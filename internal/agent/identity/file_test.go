@@ -101,3 +101,17 @@ func TestSoftwareExportableProvider_NewExportable_GeneratesUniqueKeys(t *testing
 	// But names should be the same
 	require.Equal(t, result1.Name(), result2.Name())
 }
+
+func TestFileProvider_IsAttestationEnabled(t *testing.T) {
+	provider := &fileProvider{}
+	result := provider.IsAttestationEnabled()
+	require.False(t, result, "File provider should never have attestation enabled")
+}
+
+func TestFileProvider_GetTPMClient(t *testing.T) {
+	provider := &fileProvider{}
+	result, err := provider.GetTPMClient()
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.Contains(t, err.Error(), "TPM client not available for file-based identity provider")
+}
