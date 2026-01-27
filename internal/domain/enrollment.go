@@ -20,3 +20,7 @@ type EnrollmentConfig = v1beta1.EnrollmentConfig
 type EnrollmentService = v1beta1.EnrollmentService
 type EnrollmentServiceAuth = v1beta1.EnrollmentServiceAuth
 type EnrollmentServiceService = v1beta1.EnrollmentServiceService
+
+// ========== Attestation ==========
+
+type AttestationData = v1beta1.AttestationData

@@ -282,6 +282,15 @@ func (h *ServiceHandler) CreateEnrollmentRequest(ctx context.Context, orgId uuid
 		return nil, domain.StatusBadRequest(errors.Join(errs...).Error())
 	}
 
+	// Extract attestation data if present
+	attestationPkg := extractAttestationData(&er, h.log)
+	if attestationPkg != nil {
+		// TODO: Process attestation data with Keylime verifier
+		// For now, we just extract and log the attestation data
+		h.log.Debugf("Attestation package extracted for %s, will be verified in future implementation",
+			attestationPkg.Metadata.EnrollmentRequestName)
+	}
+
 	request, isTPM, err := newSignRequestFromEnrollment(h.ca.Cfg, &er)
 	if err != nil {
 		return nil, domain.StatusBadRequest(err.Error())
@@ -351,6 +360,15 @@ func (h *ServiceHandler) ReplaceEnrollmentRequest(ctx context.Context, orgId uui
 	}
 	if name != *er.Metadata.Name {
 		return nil, domain.StatusBadRequest("resource name specified in metadata does not match name in path")
+	}
+
+	// Extract attestation data if present
+	attestationPkg := extractAttestationData(&er, h.log)
+	if attestationPkg != nil {
+		// TODO: Process attestation data with Keylime verifier
+		// For now, we just extract and log the attestation data
+		h.log.Debugf("Attestation package extracted for %s, will be verified in future implementation",
+			attestationPkg.Metadata.EnrollmentRequestName)
 	}
 
 	request, isTPM, err := newSignRequestFromEnrollment(h.ca.Cfg, &er)
