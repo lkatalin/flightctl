@@ -12,6 +12,7 @@ import (
 
 	corev1beta1 "github.com/flightctl/flightctl/api/core/v1beta1"
 	convertv1beta1 "github.com/flightctl/flightctl/internal/api/convert/v1beta1"
+	keylimeclient "github.com/flightctl/flightctl/internal/api/keylime/client"
 	"github.com/flightctl/flightctl/internal/api/server"
 	fcmiddleware "github.com/flightctl/flightctl/internal/api_server/middleware"
 	"github.com/flightctl/flightctl/internal/api_server/versioning"
@@ -147,9 +148,16 @@ func (s *Server) Run(ctx context.Context) error {
 
 	s.log.Println("Initializing API server")
 
+	// Create Keylime client if enabled
+	var keylimeClient *keylimeclient.Client
+	if s.cfg.Keylime != nil && s.cfg.Keylime.Enabled && s.cfg.Keylime.VerifierURL != "" {
+		keylimeClient = keylimeclient.NewClient(s.cfg.Keylime.VerifierURL, s.log)
+		s.log.Infof("Keylime verifier integration enabled at %s", s.cfg.Keylime.VerifierURL)
+	}
+
 	// Create service handler and wrap with tracing
 	baseServiceHandler := service.NewServiceHandler(
-		s.store, workerClient, kvStore, s.ca, s.log, s.cfg.Service.BaseAgentEndpointUrl, s.cfg.Service.BaseUIUrl, s.cfg.Service.TPMCAPaths)
+		s.store, workerClient, kvStore, s.ca, s.log, s.cfg.Service.BaseAgentEndpointUrl, s.cfg.Service.BaseUIUrl, s.cfg.Service.TPMCAPaths, keylimeClient)
 	serviceHandler := service.WrapWithTracing(baseServiceHandler)
 
 	// Initialize auth with traced service handler for OIDC provider access

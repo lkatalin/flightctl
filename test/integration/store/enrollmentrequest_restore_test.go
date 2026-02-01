@@ -82,7 +82,7 @@ var _ = Describe("EnrollmentRequest store restore operations", func() {
 		caClient, _, err := icrypto.EnsureCA(caCfg)
 		Expect(err).ToNot(HaveOccurred())
 
-		serviceHandler = service.NewServiceHandler(storeInst, workerClient, kvStore, caClient, log, "", "", []string{})
+		serviceHandler = service.NewServiceHandler(storeInst, workerClient, kvStore, caClient, log, "", "", []string{}, nil)
 	})
 
 	AfterEach(func() {
