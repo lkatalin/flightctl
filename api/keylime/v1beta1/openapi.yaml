@@ -1,0 +1,124 @@
+openapi: 3.0.1
+info:
+  title: Flight Control Keylime Verifier API
+  version: v1beta1
+  description: |
+    Keylime Verifier API client for Flight Control.
+    This API wraps communication with the Keylime verifier service for TPM attestation verification.
+  contact:
+    name: The Flight Control Team
+    url: https://flightctl.io
+    email: team@flightctl.io
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: /
+tags:
+  - name: attestation
+    description: Operations for TPM attestation verification via Keylime.
+paths:
+  /v2.1/agents/{agent_id}:
+    post:
+      tags:
+        - attestation
+      description: Verify TPM attestation data with the Keylime verifier (blocking call)
+      operationId: verifyAttestation
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: Unique identifier for the device being attested
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttestationVerificationRequest'
+      responses:
+        "200":
+          description: Attestation verification completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttestationVerificationResponse'
+        "400":
+          description: Bad Request - Invalid attestation data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    AttestationVerificationRequest:
+      type: object
+      description: Request to verify TPM attestation data with the Keylime verifier
+      properties:
+        aik_tpm:
+          type: string
+          description: Base64-encoded AIK public key from TPM
+        ek_tpm:
+          type: string
+          description: Base64-encoded EK public key from TPM
+        ekcert:
+          type: string
+          description: Base64-encoded EK certificate
+        mtls_cert:
+          type: string
+          description: mTLS certificate for secure communication (optional)
+        quote:
+          type: string
+          description: Base64-encoded TPM quote data
+        hash_alg:
+          type: string
+          description: Hash algorithm used (e.g., "sha256", "sha384")
+          default: "sha256"
+        enc_alg:
+          type: string
+          description: Encryption algorithm used (e.g., "rsa", "ecc")
+          default: "rsa"
+        sign_alg:
+          type: string
+          description: Signature algorithm used (e.g., "rsassa", "rsapss")
+          default: "rsassa"
+        mb_policy:
+          type: string
+          description: JSON-formatted measured boot policy
+        runtime_policy:
+          type: string
+          description: JSON-formatted IMA runtime policy
+        tpm_policy:
+          type: string
+          description: JSON-formatted TPM PCR policy
+      required:
+        - aik_tpm
+    AttestationVerificationResponse:
+      type: object
+      description: Response from Keylime attestation verification
+      properties:
+        results:
+          type: string
+          description: Verification result status (e.g., "Success", "Failed")
+      required:
+        - results
+    ErrorResponse:
+      type: object
+      description: Error response from Keylime verifier
+      properties:
+        code:
+          type: integer
+          description: HTTP status code
+        status:
+          type: string
+          description: Error status message
+        results:
+          type: object
+          description: Additional error details

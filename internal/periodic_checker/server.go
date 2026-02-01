@@ -82,7 +82,7 @@ func (s *Server) Run(ctx context.Context) error {
 	orgCache.Start()
 	defer orgCache.Stop()
 
-	serviceHandler := service.WrapWithTracing(service.NewServiceHandler(s.store, workerClient, kvStore, nil, s.log, "", "", []string{}))
+	serviceHandler := service.WrapWithTracing(service.NewServiceHandler(s.store, workerClient, kvStore, nil, s.log, "", "", []string{}, nil))
 
 	// Initialize the task executors
 	periodicTaskExecutors := InitializeTaskExecutors(s.log, serviceHandler, s.cfg, queuesProvider, workerClient, nil)

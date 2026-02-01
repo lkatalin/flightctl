@@ -37,6 +37,7 @@ type Config struct {
 	Periodic            *periodicConfig            `json:"periodic,omitempty"`
 	Organizations       *organizationsConfig       `json:"organizations,omitempty"`
 	TelemetryGateway    *telemetryGatewayConfig    `json:"telemetrygateway,omitempty"`
+	Keylime             *keylimeConfig             `json:"keylime,omitempty"`
 }
 
 // CryptoPolicyConfig contains cryptographic policy configuration for all protocols.
@@ -469,6 +470,11 @@ type telemetryGatewayForwardTLS struct {
 	CAFile                string `json:"caFile,omitempty"`
 	CertFile              string `json:"certFile,omitempty"`
 	KeyFile               string `json:"keyFile,omitempty"`
+}
+
+type keylimeConfig struct {
+	VerifierURL string `json:"verifierUrl,omitempty"`
+	Enabled     bool   `json:"enabled,omitempty"`
 }
 
 type ConfigOption func(*Config)

@@ -92,6 +92,7 @@ const (
 	ConditionTypeDeviceSpecValid                      ConditionType = "SpecValid"
 	ConditionTypeDeviceUpdating                       ConditionType = "Updating"
 	ConditionTypeEnrollmentRequestApproved            ConditionType = "Approved"
+	ConditionTypeEnrollmentRequestAttestationVerified ConditionType = "AttestationVerified"
 	ConditionTypeEnrollmentRequestTPMVerified         ConditionType = "TPMVerified"
 	ConditionTypeFleetRolloutInProgress               ConditionType = "RolloutInProgress"
 	ConditionTypeFleetValid                           ConditionType = "Valid"
