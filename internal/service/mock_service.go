@@ -512,6 +512,21 @@ func (mr *MockServiceMockRecorder) GetDatabaseTime(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDatabaseTime", reflect.TypeOf((*MockService)(nil).GetDatabaseTime), ctx)
 }
 
+// GetDefaultAttestationReference mocks base method.
+func (m *MockService) GetDefaultAttestationReference(ctx context.Context, orgId uuid.UUID) (*domain.AttestationReference, domain.Status) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDefaultAttestationReference", ctx, orgId)
+	ret0, _ := ret[0].(*domain.AttestationReference)
+	ret1, _ := ret[1].(domain.Status)
+	return ret0, ret1
+}
+
+// GetDefaultAttestationReference indicates an expected call of GetDefaultAttestationReference.
+func (mr *MockServiceMockRecorder) GetDefaultAttestationReference(ctx, orgId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDefaultAttestationReference", reflect.TypeOf((*MockService)(nil).GetDefaultAttestationReference), ctx, orgId)
+}
+
 // GetDevice mocks base method.
 func (m *MockService) GetDevice(ctx context.Context, orgId uuid.UUID, name string) (*domain.Device, domain.Status) {
 	m.ctrl.T.Helper()

@@ -695,7 +695,7 @@ type AttestationReference struct {
 	// Metadata ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.
 	Metadata ObjectMeta `json:"metadata"`
 
-	// Spec AttestationReferenceSpec contains the reference policies for attestation verification. All fields are optional and should contain JSON-formatted policies compatible with the Keylime verifier API.
+	// Spec AttestationReferenceSpec contains the reference policies for attestation verification. All policy fields are optional and should contain JSON-formatted policies compatible with the Keylime verifier API.
 	Spec AttestationReferenceSpec `json:"spec"`
 }
 
@@ -714,8 +714,11 @@ type AttestationReferenceList struct {
 	Metadata ListMeta `json:"metadata"`
 }
 
-// AttestationReferenceSpec AttestationReferenceSpec contains the reference policies for attestation verification. All fields are optional and should contain JSON-formatted policies compatible with the Keylime verifier API.
+// AttestationReferenceSpec AttestationReferenceSpec contains the reference policies for attestation verification. All policy fields are optional and should contain JSON-formatted policies compatible with the Keylime verifier API.
 type AttestationReferenceSpec struct {
+	// MatchAll If true, this AttestationReference will be used as the default policy for all enrollment requests that contain attestation data. Only one AttestationReference should have matchAll set to true. If multiple AttestationReferences have matchAll=true, the behavior is undefined.
+	MatchAll *bool `json:"matchAll,omitempty"`
+
 	// MbPolicy JSON-formatted measured boot policy for verifying boot-time measurements. This is the "known good value" for measured boot verification in Keylime.
 	MbPolicy *string `json:"mbPolicy,omitempty"`
 

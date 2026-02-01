@@ -6276,6 +6276,9 @@ components:
     AttestationReferenceSpec:
       type: object
       properties:
+        matchAll:
+          type: boolean
+          description: 'If true, this AttestationReference will be used as the default policy for all enrollment requests that contain attestation data. Only one AttestationReference should have matchAll set to true. If multiple AttestationReferences have matchAll=true, the behavior is undefined.'
         tpmPolicy:
           type: string
           description: 'JSON-formatted TPM policy mapping PCR numbers to arrays of acceptable hash values. This is the "known good value" for TPM PCR verification in Keylime.'
@@ -6285,7 +6288,7 @@ components:
         mbPolicy:
           type: string
           description: 'JSON-formatted measured boot policy for verifying boot-time measurements. This is the "known good value" for measured boot verification in Keylime.'
-      description: AttestationReferenceSpec contains the reference policies for attestation verification. All fields are optional and should contain JSON-formatted policies compatible with the Keylime verifier API.
+      description: AttestationReferenceSpec contains the reference policies for attestation verification. All policy fields are optional and should contain JSON-formatted policies compatible with the Keylime verifier API.
     EnrollmentRequestStatus:
       type: object
       properties:
