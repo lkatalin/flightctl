@@ -49,6 +49,14 @@ const (
 	EnrollmentRequestListKind   = v1beta1.EnrollmentRequestListKind
 )
 
+// ========== AttestationReference ==========
+
+const (
+	AttestationReferenceAPIVersion = v1beta1.AttestationReferenceAPIVersion
+	AttestationReferenceKind       = v1beta1.AttestationReferenceKind
+	AttestationReferenceListKind   = v1beta1.AttestationReferenceListKind
+)
+
 // ========== Fleet ==========
 
 const (

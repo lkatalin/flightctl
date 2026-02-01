@@ -338,6 +338,44 @@ func (t *TracedService) ReplaceEnrollmentRequestStatus(ctx context.Context, orgI
 	return resp, st
 }
 
+// --- AttestationReference ---
+func (t *TracedService) CreateAttestationReference(ctx context.Context, orgId uuid.UUID, ar domain.AttestationReference) (*domain.AttestationReference, domain.Status) {
+	ctx, span := startSpan(ctx, "CreateAttestationReference")
+	resp, st := t.inner.CreateAttestationReference(ctx, orgId, ar)
+	endSpan(span, st)
+	return resp, st
+}
+func (t *TracedService) ListAttestationReferences(ctx context.Context, orgId uuid.UUID, params domain.ListAttestationReferencesParams) (*domain.AttestationReferenceList, domain.Status) {
+	ctx, span := startSpan(ctx, "ListAttestationReferences")
+	resp, st := t.inner.ListAttestationReferences(ctx, orgId, params)
+	endSpan(span, st)
+	return resp, st
+}
+func (t *TracedService) GetAttestationReference(ctx context.Context, orgId uuid.UUID, name string) (*domain.AttestationReference, domain.Status) {
+	ctx, span := startSpan(ctx, "GetAttestationReference")
+	resp, st := t.inner.GetAttestationReference(ctx, orgId, name)
+	endSpan(span, st)
+	return resp, st
+}
+func (t *TracedService) ReplaceAttestationReference(ctx context.Context, orgId uuid.UUID, name string, ar domain.AttestationReference) (*domain.AttestationReference, domain.Status) {
+	ctx, span := startSpan(ctx, "ReplaceAttestationReference")
+	resp, st := t.inner.ReplaceAttestationReference(ctx, orgId, name, ar)
+	endSpan(span, st)
+	return resp, st
+}
+func (t *TracedService) PatchAttestationReference(ctx context.Context, orgId uuid.UUID, name string, patch domain.PatchRequest) (*domain.AttestationReference, domain.Status) {
+	ctx, span := startSpan(ctx, "PatchAttestationReference")
+	resp, st := t.inner.PatchAttestationReference(ctx, orgId, name, patch)
+	endSpan(span, st)
+	return resp, st
+}
+func (t *TracedService) DeleteAttestationReference(ctx context.Context, orgId uuid.UUID, name string) domain.Status {
+	ctx, span := startSpan(ctx, "DeleteAttestationReference")
+	st := t.inner.DeleteAttestationReference(ctx, orgId, name)
+	endSpan(span, st)
+	return st
+}
+
 // --- Fleet ---
 func (t *TracedService) CreateFleet(ctx context.Context, orgId uuid.UUID, fleet domain.Fleet) (*domain.Fleet, domain.Status) {
 	ctx, span := startSpan(ctx, "CreateFleet")

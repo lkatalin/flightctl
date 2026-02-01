@@ -34,6 +34,7 @@ func (m *mockStore) Repository() store.Repository {
 
 func (m *mockStore) Device() store.Device                                       { return nil }
 func (m *mockStore) EnrollmentRequest() store.EnrollmentRequest                 { return nil }
+func (m *mockStore) AttestationReference() store.AttestationReference           { return nil }
 func (m *mockStore) CertificateSigningRequest() store.CertificateSigningRequest { return nil }
 func (m *mockStore) Fleet() store.Fleet                                         { return nil }
 func (m *mockStore) TemplateVersion() store.TemplateVersion                     { return nil }

@@ -8,6 +8,7 @@ import (
 	"github.com/flightctl/flightctl/internal/apimetadata"
 )
 const (
+	API_RESOURCE_ATTESTATIONREFERENCES = "attestationreferences"
 	API_RESOURCE_AUTHPROVIDERS = "authproviders"
 	API_RESOURCE_CATALOGITEMS = "catalogitems"
 	API_RESOURCE_CATALOGS = "catalogs"
@@ -54,6 +55,54 @@ var ServerURLPrefixes = []string{
 // APIMetadataMap provides endpoint metadata keyed by "METHOD:/path"
 // Uses pointers to avoid copy allocations on return
 var APIMetadataMap = map[string]*apimetadata.EndpointMetadata{
+	"GET:/attestationreferences": {
+		OperationID: "listAttestationReferences",
+		Resource:    "attestationreferences",
+		Action:      "list",
+		Versions: []apimetadata.EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
+	"POST:/attestationreferences": {
+		OperationID: "createAttestationReference",
+		Resource:    "attestationreferences",
+		Action:      "create",
+		Versions: []apimetadata.EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
+	"DELETE:/attestationreferences/{name}": {
+		OperationID: "deleteAttestationReference",
+		Resource:    "attestationreferences",
+		Action:      "delete",
+		Versions: []apimetadata.EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
+	"GET:/attestationreferences/{name}": {
+		OperationID: "getAttestationReference",
+		Resource:    "attestationreferences",
+		Action:      "get",
+		Versions: []apimetadata.EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
+	"PATCH:/attestationreferences/{name}": {
+		OperationID: "patchAttestationReference",
+		Resource:    "attestationreferences",
+		Action:      "patch",
+		Versions: []apimetadata.EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
+	"PUT:/attestationreferences/{name}": {
+		OperationID: "replaceAttestationReference",
+		Resource:    "attestationreferences",
+		Action:      "update",
+		Versions: []apimetadata.EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
 	"GET:/auth/config": {
 		OperationID: "authConfig",
 		Resource:    "",

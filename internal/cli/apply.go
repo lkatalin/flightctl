@@ -290,6 +290,9 @@ func applySingleResource(ctx context.Context, c *client.Client, ibClient *client
 
 func applyResourceByKind(ctx context.Context, c *client.Client, ibClient *client.ImageBuilderClient, kind ResourceKind, resourceName string, buf []byte) applyResult {
 	switch kind {
+	case AttestationReferenceKind:
+		response, err := c.ReplaceAttestationReferenceWithBodyWithResponse(ctx, resourceName, "application/json", bytes.NewReader(buf))
+		return extractApplyResult(response, err)
 	case DeviceKind:
 		response, err := c.ReplaceDeviceWithBodyWithResponse(ctx, resourceName, "application/json", bytes.NewReader(buf))
 		return extractApplyResult(response, err)
@@ -349,6 +352,8 @@ func extractApplyResult(response interface{}, err error) applyResult {
 
 	// Use type switch to extract fields from different response types
 	switch r := response.(type) {
+	case *apiclient.ReplaceAttestationReferenceResponse:
+		return applyResult{httpResponse: r.HTTPResponse, message: string(r.Body)}
 	case *apiclient.ReplaceDeviceResponse:
 		return applyResult{httpResponse: r.HTTPResponse, message: string(r.Body)}
 	case *apiclient.ReplaceEnrollmentRequestResponse:
