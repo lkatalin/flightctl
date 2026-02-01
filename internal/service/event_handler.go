@@ -515,6 +515,31 @@ func (h *EventHandler) HandleTemplateVersionUpdatedEvents(ctx context.Context, r
 	}
 }
 
+//////////////////////////////////////////////////////
+//           AttestationReference Events            //
+//////////////////////////////////////////////////////
+
+// HandleAttestationReferenceUpdatedEvents handles attestation reference update event emission logic
+func (h *EventHandler) HandleAttestationReferenceUpdatedEvents(ctx context.Context, resourceKind domain.ResourceKind, orgId uuid.UUID, name string, oldResource, newResource interface{}, created bool, err error) {
+	if err != nil {
+		status := StoreErrorToApiStatus(err, created, string(resourceKind), &name)
+		h.CreateEvent(ctx, orgId, common.GetResourceCreatedOrUpdatedFailureEvent(ctx, created, resourceKind, name, status, nil))
+	} else {
+		// Compute ResourceUpdatedDetails for updates
+		var updateDetails *domain.ResourceUpdatedDetails
+		if !created {
+			var (
+				oldAttestationRef, newAttestationRef *domain.AttestationReference
+				ok                                   bool
+			)
+			if oldAttestationRef, newAttestationRef, ok = castResources[domain.AttestationReference](oldResource, newResource); ok && oldAttestationRef != nil && newAttestationRef != nil {
+				updateDetails = h.computeResourceUpdatedDetails(oldAttestationRef.Metadata, newAttestationRef.Metadata)
+			}
+		}
+		h.CreateEvent(ctx, orgId, common.GetResourceCreatedOrUpdatedSuccessEvent(ctx, created, resourceKind, name, updateDetails, h.log, nil))
+	}
+}
+
 // HandleCatalogUpdatedEvents handles catalog update event emission logic
 func (h *EventHandler) HandleCatalogUpdatedEvents(ctx context.Context, resourceKind domain.ResourceKind, orgId uuid.UUID, name string, oldResource, newResource interface{}, created bool, err error) {
 	if err != nil {

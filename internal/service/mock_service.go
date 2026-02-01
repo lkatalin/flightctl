@@ -89,6 +89,21 @@ func (mr *MockServiceMockRecorder) CountDevicesByLabels(ctx, orgId, params, anno
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountDevicesByLabels", reflect.TypeOf((*MockService)(nil).CountDevicesByLabels), ctx, orgId, params, annotationSelector, groupBy)
 }
 
+// CreateAttestationReference mocks base method.
+func (m *MockService) CreateAttestationReference(ctx context.Context, orgId uuid.UUID, ar domain.AttestationReference) (*domain.AttestationReference, domain.Status) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateAttestationReference", ctx, orgId, ar)
+	ret0, _ := ret[0].(*domain.AttestationReference)
+	ret1, _ := ret[1].(domain.Status)
+	return ret0, ret1
+}
+
+// CreateAttestationReference indicates an expected call of CreateAttestationReference.
+func (mr *MockServiceMockRecorder) CreateAttestationReference(ctx, orgId, ar any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAttestationReference", reflect.TypeOf((*MockService)(nil).CreateAttestationReference), ctx, orgId, ar)
+}
+
 // CreateAuthProvider mocks base method.
 func (m *MockService) CreateAuthProvider(ctx context.Context, orgId uuid.UUID, authProvider domain.AuthProvider) (*domain.AuthProvider, domain.Status) {
 	m.ctrl.T.Helper()
@@ -266,6 +281,20 @@ func (mr *MockServiceMockRecorder) DecommissionDevice(ctx, orgId, name, decom an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecommissionDevice", reflect.TypeOf((*MockService)(nil).DecommissionDevice), ctx, orgId, name, decom)
 }
 
+// DeleteAttestationReference mocks base method.
+func (m *MockService) DeleteAttestationReference(ctx context.Context, orgId uuid.UUID, name string) domain.Status {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteAttestationReference", ctx, orgId, name)
+	ret0, _ := ret[0].(domain.Status)
+	return ret0
+}
+
+// DeleteAttestationReference indicates an expected call of DeleteAttestationReference.
+func (mr *MockServiceMockRecorder) DeleteAttestationReference(ctx, orgId, name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAttestationReference", reflect.TypeOf((*MockService)(nil).DeleteAttestationReference), ctx, orgId, name)
+}
+
 // DeleteAuthProvider mocks base method.
 func (m *MockService) DeleteAuthProvider(ctx context.Context, orgId uuid.UUID, name string) domain.Status {
 	m.ctrl.T.Helper()
@@ -419,6 +448,21 @@ func (m *MockService) DeleteTemplateVersion(ctx context.Context, orgId uuid.UUID
 func (mr *MockServiceMockRecorder) DeleteTemplateVersion(ctx, orgId, fleet, name any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteTemplateVersion", reflect.TypeOf((*MockService)(nil).DeleteTemplateVersion), ctx, orgId, fleet, name)
+}
+
+// GetAttestationReference mocks base method.
+func (m *MockService) GetAttestationReference(ctx context.Context, orgId uuid.UUID, name string) (*domain.AttestationReference, domain.Status) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAttestationReference", ctx, orgId, name)
+	ret0, _ := ret[0].(*domain.AttestationReference)
+	ret1, _ := ret[1].(domain.Status)
+	return ret0, ret1
+}
+
+// GetAttestationReference indicates an expected call of GetAttestationReference.
+func (mr *MockServiceMockRecorder) GetAttestationReference(ctx, orgId, name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAttestationReference", reflect.TypeOf((*MockService)(nil).GetAttestationReference), ctx, orgId, name)
 }
 
 // GetAuthConfig mocks base method.
@@ -886,6 +930,21 @@ func (mr *MockServiceMockRecorder) ListAllCatalogItems(ctx, orgId, params any) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllCatalogItems", reflect.TypeOf((*MockService)(nil).ListAllCatalogItems), ctx, orgId, params)
 }
 
+// ListAttestationReferences mocks base method.
+func (m *MockService) ListAttestationReferences(ctx context.Context, orgId uuid.UUID, params domain.ListAttestationReferencesParams) (*domain.AttestationReferenceList, domain.Status) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAttestationReferences", ctx, orgId, params)
+	ret0, _ := ret[0].(*domain.AttestationReferenceList)
+	ret1, _ := ret[1].(domain.Status)
+	return ret0, ret1
+}
+
+// ListAttestationReferences indicates an expected call of ListAttestationReferences.
+func (mr *MockServiceMockRecorder) ListAttestationReferences(ctx, orgId, params any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAttestationReferences", reflect.TypeOf((*MockService)(nil).ListAttestationReferences), ctx, orgId, params)
+}
+
 // ListAuthProviders mocks base method.
 func (m *MockService) ListAuthProviders(ctx context.Context, orgId uuid.UUID, params domain.ListAuthProvidersParams) (*domain.AuthProviderList, domain.Status) {
 	m.ctrl.T.Helper()
@@ -1193,6 +1252,21 @@ func (mr *MockServiceMockRecorder) OverwriteFleetRepositoryRefs(ctx, orgId, name
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OverwriteFleetRepositoryRefs", reflect.TypeOf((*MockService)(nil).OverwriteFleetRepositoryRefs), varargs...)
 }
 
+// PatchAttestationReference mocks base method.
+func (m *MockService) PatchAttestationReference(ctx context.Context, orgId uuid.UUID, name string, patch domain.PatchRequest) (*domain.AttestationReference, domain.Status) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchAttestationReference", ctx, orgId, name, patch)
+	ret0, _ := ret[0].(*domain.AttestationReference)
+	ret1, _ := ret[1].(domain.Status)
+	return ret0, ret1
+}
+
+// PatchAttestationReference indicates an expected call of PatchAttestationReference.
+func (mr *MockServiceMockRecorder) PatchAttestationReference(ctx, orgId, name, patch any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchAttestationReference", reflect.TypeOf((*MockService)(nil).PatchAttestationReference), ctx, orgId, name, patch)
+}
+
 // PatchAuthProvider mocks base method.
 func (m *MockService) PatchAuthProvider(ctx context.Context, orgId uuid.UUID, name string, patch domain.PatchRequest) (*domain.AuthProvider, domain.Status) {
 	m.ctrl.T.Helper()
@@ -1356,6 +1430,21 @@ func (m *MockService) PatchResourceSync(ctx context.Context, orgId uuid.UUID, na
 func (mr *MockServiceMockRecorder) PatchResourceSync(ctx, orgId, name, patch any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchResourceSync", reflect.TypeOf((*MockService)(nil).PatchResourceSync), ctx, orgId, name, patch)
+}
+
+// ReplaceAttestationReference mocks base method.
+func (m *MockService) ReplaceAttestationReference(ctx context.Context, orgId uuid.UUID, name string, ar domain.AttestationReference) (*domain.AttestationReference, domain.Status) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReplaceAttestationReference", ctx, orgId, name, ar)
+	ret0, _ := ret[0].(*domain.AttestationReference)
+	ret1, _ := ret[1].(domain.Status)
+	return ret0, ret1
+}
+
+// ReplaceAttestationReference indicates an expected call of ReplaceAttestationReference.
+func (mr *MockServiceMockRecorder) ReplaceAttestationReference(ctx, orgId, name, ar any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplaceAttestationReference", reflect.TypeOf((*MockService)(nil).ReplaceAttestationReference), ctx, orgId, name, ar)
 }
 
 // ReplaceAuthProvider mocks base method.

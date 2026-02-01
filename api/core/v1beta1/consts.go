@@ -48,6 +48,10 @@ const (
 	EnrollmentRequestKind       = "EnrollmentRequest"
 	EnrollmentRequestListKind   = "EnrollmentRequestList"
 
+	AttestationReferenceAPIVersion = "v1beta1"
+	AttestationReferenceKind       = "AttestationReference"
+	AttestationReferenceListKind   = "AttestationReferenceList"
+
 	FleetAPIVersion = "v1beta1"
 	FleetKind       = "Fleet"
 	FleetListKind   = "FleetList"

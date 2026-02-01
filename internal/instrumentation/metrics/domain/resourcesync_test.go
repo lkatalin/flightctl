@@ -22,6 +22,9 @@ type MockResourceSyncStore struct {
 
 func (m *MockResourceSyncStore) Device() store.Device                       { return nil }
 func (m *MockResourceSyncStore) EnrollmentRequest() store.EnrollmentRequest { return nil }
+func (m *MockResourceSyncStore) AttestationReference() store.AttestationReference {
+	return nil
+}
 func (m *MockResourceSyncStore) CertificateSigningRequest() store.CertificateSigningRequest {
 	return nil
 }

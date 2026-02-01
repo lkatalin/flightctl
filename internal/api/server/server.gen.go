@@ -18,6 +18,24 @@ const ServerUrlApiv1 = "/api/v1"
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
+	// (GET /attestationreferences)
+	ListAttestationReferences(w http.ResponseWriter, r *http.Request, params ListAttestationReferencesParams)
+
+	// (POST /attestationreferences)
+	CreateAttestationReference(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /attestationreferences/{name})
+	DeleteAttestationReference(w http.ResponseWriter, r *http.Request, name string)
+
+	// (GET /attestationreferences/{name})
+	GetAttestationReference(w http.ResponseWriter, r *http.Request, name string)
+
+	// (PATCH /attestationreferences/{name})
+	PatchAttestationReference(w http.ResponseWriter, r *http.Request, name string)
+
+	// (PUT /attestationreferences/{name})
+	ReplaceAttestationReference(w http.ResponseWriter, r *http.Request, name string)
+
 	// (GET /auth/config)
 	AuthConfig(w http.ResponseWriter, r *http.Request)
 
@@ -232,6 +250,36 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// (GET /attestationreferences)
+func (_ Unimplemented) ListAttestationReferences(w http.ResponseWriter, r *http.Request, params ListAttestationReferencesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /attestationreferences)
+func (_ Unimplemented) CreateAttestationReference(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /attestationreferences/{name})
+func (_ Unimplemented) DeleteAttestationReference(w http.ResponseWriter, r *http.Request, name string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /attestationreferences/{name})
+func (_ Unimplemented) GetAttestationReference(w http.ResponseWriter, r *http.Request, name string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PATCH /attestationreferences/{name})
+func (_ Unimplemented) PatchAttestationReference(w http.ResponseWriter, r *http.Request, name string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /attestationreferences/{name})
+func (_ Unimplemented) ReplaceAttestationReference(w http.ResponseWriter, r *http.Request, name string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // (GET /auth/config)
 func (_ Unimplemented) AuthConfig(w http.ResponseWriter, r *http.Request) {
@@ -592,6 +640,171 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAttestationReferences operation middleware
+func (siw *ServerInterfaceWrapper) ListAttestationReferences(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAttestationReferencesParams
+
+	// ------------- Optional query parameter "continue" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "continue", r.URL.Query(), &params.Continue)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "continue", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "labelSelector" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "labelSelector", r.URL.Query(), &params.LabelSelector)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "labelSelector", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "fieldSelector" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "fieldSelector", r.URL.Query(), &params.FieldSelector)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fieldSelector", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAttestationReferences(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAttestationReference operation middleware
+func (siw *ServerInterfaceWrapper) CreateAttestationReference(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAttestationReference(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteAttestationReference operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAttestationReference(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAttestationReference(w, r, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAttestationReference operation middleware
+func (siw *ServerInterfaceWrapper) GetAttestationReference(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAttestationReference(w, r, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchAttestationReference operation middleware
+func (siw *ServerInterfaceWrapper) PatchAttestationReference(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchAttestationReference(w, r, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReplaceAttestationReference operation middleware
+func (siw *ServerInterfaceWrapper) ReplaceAttestationReference(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReplaceAttestationReference(w, r, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // AuthConfig operation middleware
 func (siw *ServerInterfaceWrapper) AuthConfig(w http.ResponseWriter, r *http.Request) {
@@ -2675,6 +2888,24 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/attestationreferences", wrapper.ListAttestationReferences)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/attestationreferences", wrapper.CreateAttestationReference)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/attestationreferences/{name}", wrapper.DeleteAttestationReference)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/attestationreferences/{name}", wrapper.GetAttestationReference)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/attestationreferences/{name}", wrapper.PatchAttestationReference)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/attestationreferences/{name}", wrapper.ReplaceAttestationReference)
+	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/auth/config", wrapper.AuthConfig)
 	})
