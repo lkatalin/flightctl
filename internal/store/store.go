@@ -22,6 +22,7 @@ var (
 type Store interface {
 	Device() Device
 	EnrollmentRequest() EnrollmentRequest
+	AttestationReference() AttestationReference
 	CertificateSigningRequest() CertificateSigningRequest
 	Fleet() Fleet
 	TemplateVersion() TemplateVersion
@@ -39,6 +40,7 @@ type Store interface {
 type DataStore struct {
 	device                    Device
 	enrollmentRequest         EnrollmentRequest
+	attestationReference      AttestationReference
 	certificateSigningRequest CertificateSigningRequest
 	fleet                     Fleet
 	templateVersion           TemplateVersion
@@ -56,6 +58,7 @@ func NewStore(db *gorm.DB, log logrus.FieldLogger) Store {
 	return &DataStore{
 		device:                    NewDevice(db, log),
 		enrollmentRequest:         NewEnrollmentRequest(db, log),
+		attestationReference:      NewAttestationReference(db, log),
 		certificateSigningRequest: NewCertificateSigningRequest(db, log),
 		fleet:                     NewFleet(db, log),
 		templateVersion:           NewTemplateVersion(db, log),
@@ -79,6 +82,10 @@ func (s *DataStore) Device() Device {
 
 func (s *DataStore) EnrollmentRequest() EnrollmentRequest {
 	return s.enrollmentRequest
+}
+
+func (s *DataStore) AttestationReference() AttestationReference {
+	return s.attestationReference
 }
 
 func (s *DataStore) CertificateSigningRequest() CertificateSigningRequest {
@@ -162,6 +169,9 @@ func (s *DataStore) RunMigrations(ctx context.Context) error {
 		return err
 	}
 	if err := s.EnrollmentRequest().InitialMigration(ctx); err != nil {
+		return err
+	}
+	if err := s.AttestationReference().InitialMigration(ctx); err != nil {
 		return err
 	}
 	if err := s.CertificateSigningRequest().InitialMigration(ctx); err != nil {

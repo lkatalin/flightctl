@@ -1909,3 +1909,41 @@ func (s SystemdLoadStateType) Validate() error {
 	}
 	return nil
 }
+
+// Validate validates the AttestationReference resource.
+func (a *AttestationReference) Validate() []error {
+	if a == nil {
+		return nil
+	}
+	allErrs := []error{}
+	allErrs = append(allErrs, validation.ValidateResourceName(a.Metadata.Name)...)
+	allErrs = append(allErrs, validation.ValidateLabels(a.Metadata.Labels)...)
+	allErrs = append(allErrs, validation.ValidateAnnotations(a.Metadata.Annotations)...)
+
+	// Validate policy fields are valid JSON if present
+	if a.Spec.TpmPolicy != nil && *a.Spec.TpmPolicy != "" {
+		if !json.Valid([]byte(*a.Spec.TpmPolicy)) {
+			allErrs = append(allErrs, fmt.Errorf("spec.tpmPolicy must be valid JSON"))
+		}
+	}
+	if a.Spec.RuntimePolicy != nil && *a.Spec.RuntimePolicy != "" {
+		if !json.Valid([]byte(*a.Spec.RuntimePolicy)) {
+			allErrs = append(allErrs, fmt.Errorf("spec.runtimePolicy must be valid JSON"))
+		}
+	}
+	if a.Spec.MbPolicy != nil && *a.Spec.MbPolicy != "" {
+		if !json.Valid([]byte(*a.Spec.MbPolicy)) {
+			allErrs = append(allErrs, fmt.Errorf("spec.mbPolicy must be valid JSON"))
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateUpdate ensures immutable fields are unchanged for AttestationReference.
+func (a *AttestationReference) ValidateUpdate(newObj *AttestationReference) []error {
+	return validateImmutableCoreFields(a.Metadata.Name, newObj.Metadata.Name,
+		a.ApiVersion, newObj.ApiVersion,
+		a.Kind, newObj.Kind,
+		nil, nil) // AttestationReference doesn't have status
+}

@@ -29,6 +29,10 @@ func (m *MockStore) EnrollmentRequest() store.EnrollmentRequest {
 	return nil
 }
 
+func (m *MockStore) AttestationReference() store.AttestationReference {
+	return nil
+}
+
 func (m *MockStore) CertificateSigningRequest() store.CertificateSigningRequest {
 	return nil
 }

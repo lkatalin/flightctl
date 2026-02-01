@@ -24,6 +24,7 @@ type EndpointMetadata struct {
 	Versions    []EndpointMetadataVersion // Ordered by preference (stable > beta > alpha)
 }
 const (
+	API_RESOURCE_ATTESTATIONREFERENCES = "attestationreferences"
 	API_RESOURCE_AUTHPROVIDERS = "authproviders"
 	API_RESOURCE_CERTIFICATESIGNINGREQUESTS = "certificatesigningrequests"
 	API_RESOURCE_CERTIFICATESIGNINGREQUESTS_APPROVAL = "certificatesigningrequests/approval"
@@ -66,6 +67,54 @@ var ServerURLPrefixes = []string{
 
 // APIMetadataMap provides O(1) lookup for endpoint metadata using pattern+method as key
 var APIMetadataMap = map[string]EndpointMetadata{
+	"GET:/attestationreferences": {
+		OperationID: "listAttestationReferences",
+		Resource:    "attestationreferences",
+		Action:      "list",
+		Versions: []EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
+	"POST:/attestationreferences": {
+		OperationID: "createAttestationReference",
+		Resource:    "attestationreferences",
+		Action:      "create",
+		Versions: []EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
+	"DELETE:/attestationreferences/{name}": {
+		OperationID: "deleteAttestationReference",
+		Resource:    "attestationreferences",
+		Action:      "delete",
+		Versions: []EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
+	"GET:/attestationreferences/{name}": {
+		OperationID: "getAttestationReference",
+		Resource:    "attestationreferences",
+		Action:      "get",
+		Versions: []EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
+	"PATCH:/attestationreferences/{name}": {
+		OperationID: "patchAttestationReference",
+		Resource:    "attestationreferences",
+		Action:      "patch",
+		Versions: []EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
+	"PUT:/attestationreferences/{name}": {
+		OperationID: "replaceAttestationReference",
+		Resource:    "attestationreferences",
+		Action:      "update",
+		Versions: []EndpointMetadataVersion{
+			{Version: "v1beta1", DeprecatedAt: nil},
+		},
+	},
 	"GET:/auth/config": {
 		OperationID: "authConfig",
 		Resource:    "",

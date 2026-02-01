@@ -67,6 +67,14 @@ type Service interface {
 	ApproveEnrollmentRequest(ctx context.Context, orgId uuid.UUID, name string, approval domain.EnrollmentRequestApproval) (*domain.EnrollmentRequestApprovalStatus, domain.Status)
 	ReplaceEnrollmentRequestStatus(ctx context.Context, orgId uuid.UUID, name string, er domain.EnrollmentRequest) (*domain.EnrollmentRequest, domain.Status)
 
+	// AttestationReference
+	CreateAttestationReference(ctx context.Context, orgId uuid.UUID, ar domain.AttestationReference) (*domain.AttestationReference, domain.Status)
+	ListAttestationReferences(ctx context.Context, orgId uuid.UUID, params domain.ListAttestationReferencesParams) (*domain.AttestationReferenceList, domain.Status)
+	GetAttestationReference(ctx context.Context, orgId uuid.UUID, name string) (*domain.AttestationReference, domain.Status)
+	ReplaceAttestationReference(ctx context.Context, orgId uuid.UUID, name string, ar domain.AttestationReference) (*domain.AttestationReference, domain.Status)
+	PatchAttestationReference(ctx context.Context, orgId uuid.UUID, name string, patch domain.PatchRequest) (*domain.AttestationReference, domain.Status)
+	DeleteAttestationReference(ctx context.Context, orgId uuid.UUID, name string) domain.Status
+
 	// Fleet
 	CreateFleet(ctx context.Context, orgId uuid.UUID, fleet domain.Fleet) (*domain.Fleet, domain.Status)
 	ListFleets(ctx context.Context, orgId uuid.UUID, params domain.ListFleetsParams) (*domain.FleetList, domain.Status)

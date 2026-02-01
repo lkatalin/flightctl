@@ -24,3 +24,7 @@ type EnrollmentServiceService = v1beta1.EnrollmentServiceService
 // ========== Attestation ==========
 
 type AttestationData = v1beta1.AttestationData
+type AttestationReference = v1beta1.AttestationReference
+type AttestationReferenceList = v1beta1.AttestationReferenceList
+type AttestationReferenceSpec = v1beta1.AttestationReferenceSpec
+type ListAttestationReferencesParams = v1beta1.ListAttestationReferencesParams

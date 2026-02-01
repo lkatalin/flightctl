@@ -28,6 +28,7 @@ func (m *MockRepositoryStore) Repository() store.Repository {
 // Implement other required methods with empty implementations
 func (m *MockRepositoryStore) Device() store.Device                                       { return nil }
 func (m *MockRepositoryStore) EnrollmentRequest() store.EnrollmentRequest                 { return nil }
+func (m *MockRepositoryStore) AttestationReference() store.AttestationReference           { return nil }
 func (m *MockRepositoryStore) CertificateSigningRequest() store.CertificateSigningRequest { return nil }
 func (m *MockRepositoryStore) Fleet() store.Fleet                                         { return nil }
 func (m *MockRepositoryStore) TemplateVersion() store.TemplateVersion                     { return nil }

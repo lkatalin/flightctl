@@ -422,6 +422,7 @@ const (
 
 // Defines values for ResourceKind.
 const (
+	ResourceKindAttestationReference      ResourceKind = "AttestationReference"
 	ResourceKindAuthProvider              ResourceKind = "AuthProvider"
 	ResourceKindCertificateSigningRequest ResourceKind = "CertificateSigningRequest"
 	ResourceKindDevice                    ResourceKind = "Device"
@@ -681,6 +682,48 @@ type AttestationData struct {
 
 	// TpmEk Base64-encoded TPM Endorsement Key public key.
 	TpmEk *string `json:"tpmEk,omitempty"`
+}
+
+// AttestationReference AttestationReference contains reference policies for validating TPM attestation evidence using Keylime.
+type AttestationReference struct {
+	// ApiVersion APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+	ApiVersion string `json:"apiVersion"`
+
+	// Kind Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+	Kind string `json:"kind"`
+
+	// Metadata ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.
+	Metadata ObjectMeta `json:"metadata"`
+
+	// Spec AttestationReferenceSpec contains the reference policies for attestation verification. All fields are optional and should contain JSON-formatted policies compatible with the Keylime verifier API.
+	Spec AttestationReferenceSpec `json:"spec"`
+}
+
+// AttestationReferenceList AttestationReferenceList is a list of AttestationReference.
+type AttestationReferenceList struct {
+	// ApiVersion APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+	ApiVersion string `json:"apiVersion"`
+
+	// Items List of AttestationReference.
+	Items []AttestationReference `json:"items"`
+
+	// Kind Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+	Kind string `json:"kind"`
+
+	// Metadata ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.
+	Metadata ListMeta `json:"metadata"`
+}
+
+// AttestationReferenceSpec AttestationReferenceSpec contains the reference policies for attestation verification. All fields are optional and should contain JSON-formatted policies compatible with the Keylime verifier API.
+type AttestationReferenceSpec struct {
+	// MbPolicy JSON-formatted measured boot policy for verifying boot-time measurements. This is the "known good value" for measured boot verification in Keylime.
+	MbPolicy *string `json:"mbPolicy,omitempty"`
+
+	// RuntimePolicy JSON-formatted IMA runtime policy containing expected digests, keyrings, and verification keys. This is the "known good value" for IMA runtime measurement verification in Keylime.
+	RuntimePolicy *string `json:"runtimePolicy,omitempty"`
+
+	// TpmPolicy JSON-formatted TPM policy mapping PCR numbers to arrays of acceptable hash values. This is the "known good value" for TPM PCR verification in Keylime.
+	TpmPolicy *string `json:"tpmPolicy,omitempty"`
 }
 
 // AuthConfig defines model for AuthConfig.
@@ -3020,6 +3063,21 @@ type VolumeMount struct {
 	Path string `json:"path"`
 }
 
+// ListAttestationReferencesParams defines parameters for ListAttestationReferences.
+type ListAttestationReferencesParams struct {
+	// Continue An optional parameter to query more results from the server. The value of the paramter must match the value of the 'continue' field in the previous list response.
+	Continue *string `form:"continue,omitempty" json:"continue,omitempty"`
+
+	// LabelSelector A selector to restrict the list of returned objects by their labels. Defaults to everything.
+	LabelSelector *string `form:"labelSelector,omitempty" json:"labelSelector,omitempty"`
+
+	// FieldSelector A selector to restrict the list of returned objects by their fields, supporting operators like '=', '==', and '!=' (e.g., "key1=value1,key2!=value2").
+	FieldSelector *string `form:"fieldSelector,omitempty" json:"fieldSelector,omitempty"`
+
+	// Limit The maximum number of results returned in the list response. The server will set the 'continue' field in the list response if more results exist. The continue value may then be specified as parameter in a subsequent query.
+	Limit *int32 `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // AuthValidateParams defines parameters for AuthValidate.
 type AuthValidateParams struct {
 	// Authorization The authentication token to validate.
@@ -3211,6 +3269,15 @@ type ListResourceSyncsParams struct {
 	// Limit The maximum number of results returned in the list response. The server will set the 'continue' field in the list response if more results exist. The continue value may then be specified as parameter in a subsequent query.
 	Limit *int32 `form:"limit,omitempty" json:"limit,omitempty"`
 }
+
+// CreateAttestationReferenceJSONRequestBody defines body for CreateAttestationReference for application/json ContentType.
+type CreateAttestationReferenceJSONRequestBody = AttestationReference
+
+// PatchAttestationReferenceJSONRequestBody defines body for PatchAttestationReference for application/json ContentType.
+type PatchAttestationReferenceJSONRequestBody = PatchRequest
+
+// ReplaceAttestationReferenceJSONRequestBody defines body for ReplaceAttestationReference for application/json ContentType.
+type ReplaceAttestationReferenceJSONRequestBody = AttestationReference
 
 // AuthTokenJSONRequestBody defines body for AuthToken for application/json ContentType.
 type AuthTokenJSONRequestBody = TokenRequest

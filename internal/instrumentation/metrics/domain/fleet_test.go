@@ -142,6 +142,10 @@ func (m *MockFleetStoreWrapper) EnrollmentRequest() store.EnrollmentRequest {
 	return nil
 }
 
+func (m *MockFleetStoreWrapper) AttestationReference() store.AttestationReference {
+	return nil
+}
+
 func (m *MockFleetStoreWrapper) CertificateSigningRequest() store.CertificateSigningRequest {
 	return nil
 }
