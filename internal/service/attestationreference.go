@@ -69,6 +69,14 @@ func (h *ServiceHandler) DeleteAttestationReference(ctx context.Context, orgId u
 	return StoreErrorToApiStatus(err, false, domain.AttestationReferenceKind, &name)
 }
 
+func (h *ServiceHandler) GetDefaultAttestationReference(ctx context.Context, orgId uuid.UUID) (*domain.AttestationReference, domain.Status) {
+	result, err := h.store.AttestationReference().GetDefault(ctx, orgId)
+	if err != nil {
+		return nil, StoreErrorToApiStatus(err, false, domain.AttestationReferenceKind, nil)
+	}
+	return result, domain.StatusOK()
+}
+
 func (h *ServiceHandler) PatchAttestationReference(ctx context.Context, orgId uuid.UUID, name string, patch domain.PatchRequest) (*domain.AttestationReference, domain.Status) {
 	currentObj, err := h.store.AttestationReference().Get(ctx, orgId, name)
 	if err != nil {
