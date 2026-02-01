@@ -375,6 +375,12 @@ func (t *TracedService) DeleteAttestationReference(ctx context.Context, orgId uu
 	endSpan(span, st)
 	return st
 }
+func (t *TracedService) GetDefaultAttestationReference(ctx context.Context, orgId uuid.UUID) (*domain.AttestationReference, domain.Status) {
+	ctx, span := startSpan(ctx, "GetDefaultAttestationReference")
+	resp, st := t.inner.GetDefaultAttestationReference(ctx, orgId)
+	endSpan(span, st)
+	return resp, st
+}
 
 // --- Fleet ---
 func (t *TracedService) CreateFleet(ctx context.Context, orgId uuid.UUID, fleet domain.Fleet) (*domain.Fleet, domain.Status) {

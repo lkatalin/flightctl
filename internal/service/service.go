@@ -74,6 +74,7 @@ type Service interface {
 	ReplaceAttestationReference(ctx context.Context, orgId uuid.UUID, name string, ar domain.AttestationReference) (*domain.AttestationReference, domain.Status)
 	PatchAttestationReference(ctx context.Context, orgId uuid.UUID, name string, patch domain.PatchRequest) (*domain.AttestationReference, domain.Status)
 	DeleteAttestationReference(ctx context.Context, orgId uuid.UUID, name string) domain.Status
+	GetDefaultAttestationReference(ctx context.Context, orgId uuid.UUID) (*domain.AttestationReference, domain.Status)
 
 	// Fleet
 	CreateFleet(ctx context.Context, orgId uuid.UUID, fleet domain.Fleet) (*domain.Fleet, domain.Status)
