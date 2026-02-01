@@ -6976,6 +6976,7 @@ components:
       enum:
       - 'Approved'              # EnrollmentRequest
       - 'TPMVerified'           # EnrollmentRequest
+      - 'AttestationVerified'   # EnrollmentRequest
       - 'Approved'              # CertificateSigningRequest
       - 'Denied'                # CertificateSigningRequest
       - 'Failed'                # CertificateSigningRequest
@@ -6993,6 +6994,7 @@ components:
       x-enum-varnames:
       - EnrollmentRequestApproved
       - EnrollmentRequestTPMVerified
+      - EnrollmentRequestAttestationVerified
       - CertificateSigningRequestApproved
       - CertificateSigningRequestDenied
       - CertificateSigningRequestFailed

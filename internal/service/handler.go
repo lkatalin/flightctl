@@ -1,6 +1,7 @@
 package service
 
 import (
+	keylimeclient "github.com/flightctl/flightctl/internal/api/keylime/client"
 	"github.com/flightctl/flightctl/internal/crypto"
 	"github.com/flightctl/flightctl/internal/kvstore"
 	"github.com/flightctl/flightctl/internal/store"
@@ -20,9 +21,10 @@ type ServiceHandler struct {
 	uiUrl         string
 	tpmCAPaths    []string
 	agentGate     *semaphore.Weighted
+	keylimeClient *keylimeclient.Client
 }
 
-func NewServiceHandler(store store.Store, workerClient worker_client.WorkerClient, kvStore kvstore.KVStore, ca *crypto.CAClient, log logrus.FieldLogger, agentEndpoint string, uiUrl string, tpmCAPaths []string) *ServiceHandler {
+func NewServiceHandler(store store.Store, workerClient worker_client.WorkerClient, kvStore kvstore.KVStore, ca *crypto.CAClient, log logrus.FieldLogger, agentEndpoint string, uiUrl string, tpmCAPaths []string, keylimeClient *keylimeclient.Client) *ServiceHandler {
 	return &ServiceHandler{
 		eventHandler:  NewEventHandler(store, workerClient, log),
 		store:         store,
@@ -34,6 +36,7 @@ func NewServiceHandler(store store.Store, workerClient worker_client.WorkerClien
 		uiUrl:         uiUrl,
 		tpmCAPaths:    tpmCAPaths,
 		agentGate:     semaphore.NewWeighted(MaxConcurrentAgents),
+		keylimeClient: keylimeClient,
 	}
 }
 

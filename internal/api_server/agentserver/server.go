@@ -11,6 +11,7 @@ import (
 
 	agentv1beta1 "github.com/flightctl/flightctl/api/agent/v1beta1"
 	convertv1beta1 "github.com/flightctl/flightctl/internal/api/convert/v1beta1"
+	keylimeclient "github.com/flightctl/flightctl/internal/api/keylime/client"
 	apimetaserver "github.com/flightctl/flightctl/internal/api/server"
 	agentserver "github.com/flightctl/flightctl/internal/api/server/agent"
 	apiserver "github.com/flightctl/flightctl/internal/api_server"
@@ -92,8 +93,15 @@ func (s *AgentServer) init(ctx context.Context) error {
 	}
 	workerClient := worker_client.NewWorkerClient(publisher, s.log)
 
+	// Create Keylime client if enabled
+	var keylimeClient *keylimeclient.Client
+	if s.cfg.Keylime != nil && s.cfg.Keylime.Enabled && s.cfg.Keylime.VerifierURL != "" {
+		keylimeClient = keylimeclient.NewClient(s.cfg.Keylime.VerifierURL, s.log)
+		s.log.Infof("Keylime verifier integration enabled at %s", s.cfg.Keylime.VerifierURL)
+	}
+
 	s.serviceHandler = service.WrapWithTracing(
-		service.NewServiceHandler(s.store, workerClient, s.kvStore, s.ca, s.log, s.cfg.Service.AgentEndpointAddress, s.cfg.Service.BaseUIUrl, s.cfg.Service.TPMCAPaths))
+		service.NewServiceHandler(s.store, workerClient, s.kvStore, s.ca, s.log, s.cfg.Service.AgentEndpointAddress, s.cfg.Service.BaseUIUrl, s.cfg.Service.TPMCAPaths, keylimeClient))
 
 	s.agentGrpcServer = NewAgentGrpcServer(s.log, s.cfg, s.serviceHandler)
 	return nil

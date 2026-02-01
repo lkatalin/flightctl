@@ -64,6 +64,94 @@ func (h *ServiceHandler) verifyTPMEnrollmentRequest(er *domain.EnrollmentRequest
 	return nil
 }
 
+// processAttestationWithKeylime sends attestation data to Keylime verifier and updates enrollment request status
+func (h *ServiceHandler) processAttestationWithKeylime(ctx context.Context, orgId uuid.UUID, attestationPkg *AttestationPackage, er *domain.EnrollmentRequest) error {
+	// Skip if Keylime client is not configured
+	if h.keylimeClient == nil {
+		h.log.Debug("Keylime client not configured, skipping attestation verification")
+		return nil
+	}
+
+	// Get the default AttestationReference
+	attestationRef, err := h.store.AttestationReference().GetDefault(ctx, orgId)
+	if err != nil {
+		h.log.Warnf("Failed to get default AttestationReference for attestation verification: %v", err)
+		condition := domain.Condition{
+			Type:    domain.ConditionTypeEnrollmentRequestAttestationVerified,
+			Status:  domain.ConditionStatusFalse,
+			Reason:  "AttestationReferenceLookupFailed",
+			Message: fmt.Sprintf("Failed to get default attestation policy: %v", err),
+		}
+		domain.SetStatusCondition(&er.Status.Conditions, condition)
+		return nil
+	}
+
+	// Check if TPM AIK is present (required)
+	if attestationPkg.Data.TpmAk == nil {
+		h.log.Warnf("Attestation package for %s missing required TPM AIK", attestationPkg.Metadata.EnrollmentRequestName)
+		condition := domain.Condition{
+			Type:    domain.ConditionTypeEnrollmentRequestAttestationVerified,
+			Status:  domain.ConditionStatusFalse,
+			Reason:  "AttestationDataIncomplete",
+			Message: "Missing required TPM AIK in attestation data",
+		}
+		domain.SetStatusCondition(&er.Status.Conditions, condition)
+		return nil
+	}
+
+	// Use enrollment request name as device ID
+	deviceID := attestationPkg.Metadata.EnrollmentRequestName
+
+	h.log.Infof("Verifying attestation for device %s with Keylime verifier using AttestationReference %s", deviceID, *attestationRef.Metadata.Name)
+
+	// Call the Keylime verifier (blocking call)
+	resultStatus, err := h.keylimeClient.VerifyAttestation(
+		ctx,
+		deviceID,
+		*attestationPkg.Data.TpmAk,
+		attestationPkg.Data.TpmEk,
+		attestationRef.Spec.MbPolicy,
+		attestationRef.Spec.RuntimePolicy,
+		attestationRef.Spec.TpmPolicy,
+	)
+	if err != nil {
+		h.log.Errorf("Keylime attestation verification failed for %s: %v", deviceID, err)
+		condition := domain.Condition{
+			Type:    domain.ConditionTypeEnrollmentRequestAttestationVerified,
+			Status:  domain.ConditionStatusFalse,
+			Reason:  "KeylimeVerificationFailed",
+			Message: fmt.Sprintf("Keylime attestation verification failed: %v", err),
+		}
+		domain.SetStatusCondition(&er.Status.Conditions, condition)
+		return nil
+	}
+
+	// Check the response
+	if resultStatus != "Success" {
+		h.log.Warnf("Keylime verifier returned non-success status for %s: %s", deviceID, resultStatus)
+		condition := domain.Condition{
+			Type:    domain.ConditionTypeEnrollmentRequestAttestationVerified,
+			Status:  domain.ConditionStatusFalse,
+			Reason:  "KeylimeVerificationRejected",
+			Message: fmt.Sprintf("Keylime verifier rejected attestation: %s", resultStatus),
+		}
+		domain.SetStatusCondition(&er.Status.Conditions, condition)
+		return nil
+	}
+
+	// Successful verification
+	h.log.Infof("Keylime verifier successfully verified attestation for device %s", deviceID)
+	condition := domain.Condition{
+		Type:    domain.ConditionTypeEnrollmentRequestAttestationVerified,
+		Status:  domain.ConditionStatusTrue,
+		Reason:  "KeylimeVerificationSucceeded",
+		Message: fmt.Sprintf("Attestation verified by Keylime verifier using policy %s", *attestationRef.Metadata.Name),
+	}
+	domain.SetStatusCondition(&er.Status.Conditions, condition)
+
+	return nil
+}
+
 func approveAndSignEnrollmentRequest(ctx context.Context, ca *crypto.CAClient, enrollmentRequest *domain.EnrollmentRequest, approval *domain.EnrollmentRequestApprovalStatus) error {
 	if enrollmentRequest == nil {
 		return errors.New("approveAndSignEnrollmentRequest: enrollmentRequest is nil")
@@ -282,13 +370,12 @@ func (h *ServiceHandler) CreateEnrollmentRequest(ctx context.Context, orgId uuid
 		return nil, domain.StatusBadRequest(errors.Join(errs...).Error())
 	}
 
-	// Extract attestation data if present
+	// Extract attestation data if present and process with Keylime verifier
 	attestationPkg := extractAttestationData(&er, h.log)
 	if attestationPkg != nil {
-		// TODO: Process attestation data with Keylime verifier
-		// For now, we just extract and log the attestation data
-		h.log.Debugf("Attestation package extracted for %s, will be verified in future implementation",
-			attestationPkg.Metadata.EnrollmentRequestName)
+		if err := h.processAttestationWithKeylime(ctx, orgId, attestationPkg, &er); err != nil {
+			h.log.Errorf("Failed to process attestation with Keylime: %v", err)
+		}
 	}
 
 	request, isTPM, err := newSignRequestFromEnrollment(h.ca.Cfg, &er)
@@ -362,13 +449,12 @@ func (h *ServiceHandler) ReplaceEnrollmentRequest(ctx context.Context, orgId uui
 		return nil, domain.StatusBadRequest("resource name specified in metadata does not match name in path")
 	}
 
-	// Extract attestation data if present
+	// Extract attestation data if present and process with Keylime verifier
 	attestationPkg := extractAttestationData(&er, h.log)
 	if attestationPkg != nil {
-		// TODO: Process attestation data with Keylime verifier
-		// For now, we just extract and log the attestation data
-		h.log.Debugf("Attestation package extracted for %s, will be verified in future implementation",
-			attestationPkg.Metadata.EnrollmentRequestName)
+		if err := h.processAttestationWithKeylime(ctx, orgId, attestationPkg, &er); err != nil {
+			h.log.Errorf("Failed to process attestation with Keylime: %v", err)
+		}
 	}
 
 	request, isTPM, err := newSignRequestFromEnrollment(h.ca.Cfg, &er)
