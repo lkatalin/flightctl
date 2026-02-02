@@ -1,0 +1,19 @@
+{{- if .Values.keylime.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: keylime-verifier
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "flightctl.standardLabels" . | nindent 4 }}
+    flightctl.service: keylime-verifier
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8881
+    targetPort: 8881
+    protocol: TCP
+    name: verifier
+  selector:
+    flightctl.service: keylime-verifier
+{{- end }}

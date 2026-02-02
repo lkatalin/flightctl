@@ -138,4 +138,43 @@ clean-services-container:
 	sudo podman rm flightctl-services || true
 	sudo podman rmi localhost/flightctl-services:latest || true
 
-PHONY: deploy-db deploy cluster services-container run-services-container clean-services-container
+# Attestation demo deployment with Keylime verifier
+ifndef SKIP_BUILD
+attestation-demo-deploy-helm: keylime-verifier-container flightctl-api-container flightctl-db-setup-container flightctl-worker-container flightctl-periodic-container flightctl-alert-exporter-container flightctl-alertmanager-proxy-container flightctl-imagebuilder-api-container flightctl-imagebuilder-worker-container flightctl-multiarch-cli-container flightctl-telemetry-gateway-container
+else
+attestation-demo-deploy-helm:
+	@echo "Skipping container builds (SKIP_BUILD is set)"
+endif
+attestation-demo-deploy-helm:
+	kubectl config set-context kind-kind
+	test/scripts/install_helm.sh
+	@echo "Loading keylime-verifier container into kind cluster..."
+	@source test/scripts/functions && kind_load_image localhost/keylime-verifier:latest
+	@echo "Deploying with attestation demo configuration..."
+	EXTRA_VALUES_FILE=./deploy/helm/flightctl/values.attestation-demo.yaml test/scripts/deploy_with_helm.sh --db-size $(DB_SIZE)
+
+ifndef SKIP_BUILD
+attestation-demo: cluster build-cli attestation-demo-deploy-helm prepare-agent-config agent-vm
+	@echo ""
+	@echo "=========================================="
+	@echo "Attestation Demo Environment Ready!"
+	@echo "=========================================="
+	@echo "TPM-enabled agent VM and Keylime verifier are running"
+	@echo "You can now test TPM attestation during device enrollment"
+	@echo ""
+else
+attestation-demo: cluster attestation-demo-deploy-helm prepare-agent-config agent-vm
+	@echo ""
+	@echo "=========================================="
+	@echo "Attestation Demo Environment Ready!"
+	@echo "=========================================="
+	@echo "TPM-enabled agent VM and Keylime verifier are running"
+	@echo "You can now test TPM attestation during device enrollment"
+	@echo ""
+	@echo "Skipped container and CLI builds (SKIP_BUILD is set)"
+	@echo ""
+endif
+
+clean-attestation-demo: clean-agent-vm clean-cluster
+
+PHONY: deploy-db deploy cluster services-container run-services-container clean-services-container attestation-demo-deploy-helm attestation-demo clean-attestation-demo

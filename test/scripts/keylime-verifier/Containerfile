@@ -1,0 +1,18 @@
+# Simple Keylime verifier mock for testing FlightCTL attestation flow
+# This is a minimal one-shot verifier that accepts attestation requests and returns success
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install Flask for simple HTTP server
+RUN pip install --no-cache-dir flask==3.0.0
+
+# Copy the mock verifier server
+COPY verifier_mock.py /app/verifier_mock.py
+
+# Expose Keylime verifier port
+EXPOSE 8881
+
+# Run the mock verifier
+CMD ["python", "/app/verifier_mock.py"]

@@ -1,0 +1,43 @@
+{{- if .Values.keylime.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keylime-verifier
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "flightctl.standardLabels" . | nindent 4 }}
+    flightctl.service: keylime-verifier
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      flightctl.service: keylime-verifier
+  template:
+    metadata:
+      labels:
+        {{- include "flightctl.standardLabels" . | nindent 8 }}
+        flightctl.service: keylime-verifier
+    spec:
+      containers:
+      - name: verifier
+        image: {{ .Values.keylime.image.repository }}:{{ .Values.keylime.image.tag | default "latest" }}
+        imagePullPolicy: {{ .Values.keylime.image.pullPolicy | default "IfNotPresent" }}
+        ports:
+        - containerPort: 8881
+          name: verifier
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8881
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8881
+          initialDelaySeconds: 3
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.keylime.resources | nindent 10 }}
+{{- end }}

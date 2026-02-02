@@ -396,6 +396,26 @@ dbSetup:
     # -- Maximum runtime in seconds for the migration Job (0 = no deadline)
     activeDeadlineSeconds: 0
 
+# -- Keylime Verifier for TPM attestation (test/development use only)
+keylime:
+  # -- Enable Keylime verifier integration
+  enabled: false
+  # -- Keylime verifier URL (if not set, defaults to in-cluster service)
+  verifierUrl: ""
+  # -- Keylime verifier container image
+  image:
+    repository: localhost/keylime-verifier
+    tag: latest
+    pullPolicy: IfNotPresent
+  # -- Resource limits for Keylime verifier
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
 # -- Upgrade hooks
 upgradeHooks:
   scaleDown:

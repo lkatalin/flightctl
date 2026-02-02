@@ -297,7 +297,10 @@ flightctl-imagebuilder-worker-container: Containerfile.imagebuilder-worker go.mo
 		--build-arg SOURCE_GIT_COMMIT=${SOURCE_GIT_COMMIT} \
 		-f Containerfile.imagebuilder-worker -t flightctl-imagebuilder-worker:latest -t quay.io/flightctl/flightctl-imagebuilder-worker:$(SOURCE_GIT_TAG)
 
-.PHONY: flightctl-api-container flightctl-pam-issuer-container flightctl-db-setup-container flightctl-worker-container flightctl-periodic-container flightctl-alert-exporter-container flightctl-alertmanager-proxy-container flightctl-multiarch-cli-container flightctl-userinfo-proxy-container flightctl-telemetry-gateway-container flightctl-imagebuilder-api-container flightctl-imagebuilder-worker-container
+keylime-verifier-container: test/scripts/keylime-verifier/Containerfile test/scripts/keylime-verifier/verifier_mock.py
+	podman build -f test/scripts/keylime-verifier/Containerfile -t keylime-verifier:latest test/scripts/keylime-verifier/
+
+.PHONY: flightctl-api-container flightctl-pam-issuer-container flightctl-db-setup-container flightctl-worker-container flightctl-periodic-container flightctl-alert-exporter-container flightctl-alertmanager-proxy-container flightctl-multiarch-cli-container flightctl-userinfo-proxy-container flightctl-telemetry-gateway-container flightctl-imagebuilder-api-container flightctl-imagebuilder-worker-container keylime-verifier-container
 
 # --- Registry Operations ---
 # The login target expects REGISTRY_USER via environment variable and

@@ -1,0 +1,8 @@
+# Values for attestation demo mode
+# This enables TPM attestation with Keylime verifier
+
+# Enable Keylime verifier for attestation
+keylime:
+  enabled: true
+
+# Use development settings from values.dev.yaml as base
