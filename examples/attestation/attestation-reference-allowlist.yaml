@@ -1,0 +1,21 @@
+apiVersion: v1beta1
+kind: AttestationReference
+metadata:
+  name: default-ima-policy
+spec:
+  # This AttestationReference will be used as the default policy for all enrollments
+  matchAll: true
+
+  # Runtime policy in allowlist format - using fake hashes for testing
+  # Keylime will process this but reject it (valid=false) since measurements won't match
+  runtimePolicy: |
+    abc123def456abc123def456abc123def456abc123def456abc123def456abc1 /usr/bin/bash
+
+  # TPM policy with mask 0x0 means no PCR verification
+  tpmPolicy: |
+    {"mask": "0x0"}
+
+  # Measured boot policy - empty JSON disables measured boot validation
+  # This prevents failures from tpm2_eventlog warnings with swtpm
+  mbPolicy: |
+    {}

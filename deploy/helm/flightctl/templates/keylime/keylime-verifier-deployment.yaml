@@ -1,0 +1,128 @@
+{{- if .Values.keylime.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keylime-verifier
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "flightctl.standardLabels" . | nindent 4 }}
+    flightctl.service: keylime-verifier
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      flightctl.service: keylime-verifier
+  template:
+    metadata:
+      labels:
+        {{- include "flightctl.standardLabels" . | nindent 8 }}
+        flightctl.service: keylime-verifier
+    spec:
+      # Init container to generate TLS certificates using OpenSSL directly
+      initContainers:
+      - name: generate-certs
+        image: {{ .Values.keylime.image.repository }}:{{ .Values.keylime.image.tag | default "latest" }}
+        imagePullPolicy: {{ .Values.keylime.image.pullPolicy | default "IfNotPresent" }}
+        command:
+        - sh
+        - -c
+        - |
+          set -e
+          CA_DIR="/var/lib/keylime/cv_ca"
+          mkdir -p "$CA_DIR"
+
+          if [ -f "$CA_DIR/cacert.crt" ]; then
+            echo "Certificates already exist, skipping generation"
+            exit 0
+          fi
+
+          echo "Generating CA and certificates with OpenSSL..."
+          cd "$CA_DIR"
+
+          # Generate CA private key
+          openssl genrsa -out ca-key.pem 2048
+
+          # Generate CA certificate
+          openssl req -new -x509 -days 3650 -key ca-key.pem -out cacert.crt \
+            -subj "/C=US/ST=MA/L=Lexington/O=MITLL/OU=53/CN=Keylime Certificate Authority"
+
+          # Generate server private key
+          openssl genrsa -out server-private.pem 2048
+
+          # Generate server CSR
+          openssl req -new -key server-private.pem -out server.csr \
+            -subj "/C=US/ST=MA/L=Lexington/O=MITLL/OU=53/CN=server"
+
+          # Sign server certificate with CA
+          openssl x509 -req -in server.csr -CA cacert.crt -CAkey ca-key.pem \
+            -CAcreateserial -out server-cert.crt -days 3650
+
+          # Generate client private key
+          openssl genrsa -out client-private.pem 2048
+
+          # Generate client CSR
+          openssl req -new -key client-private.pem -out client.csr \
+            -subj "/C=US/ST=MA/L=Lexington/O=MITLL/OU=53/CN=client"
+
+          # Sign client certificate with CA
+          openssl x509 -req -in client.csr -CA cacert.crt -CAkey ca-key.pem \
+            -CAcreateserial -out client-cert.crt -days 3650
+
+          # Cleanup CSR files
+          rm -f server.csr client.csr
+
+          echo "Certificates generated successfully:"
+          ls -la "$CA_DIR"
+        volumeMounts:
+        - name: tls-certs
+          mountPath: /var/lib/keylime/cv_ca
+      containers:
+      - name: verifier
+        image: {{ .Values.keylime.image.repository }}:{{ .Values.keylime.image.tag | default "latest" }}
+        imagePullPolicy: {{ .Values.keylime.image.pullPolicy | default "IfNotPresent" }}
+        env:
+        # Override Kubernetes-injected KEYLIME_VERIFIER_PORT (which includes tcp:// prefix)
+        # Keylime expects just the port number
+        - name: KEYLIME_VERIFIER_PORT
+          value: "8881"
+        # Bind to all interfaces (0.0.0.0) instead of just localhost
+        # so Kubernetes probes can connect to the pod IP
+        - name: KEYLIME_VERIFIER_IP
+          value: "0.0.0.0"
+        # Note: enable_agent_mtls is configured via ConfigMap mount (env var override not supported)
+        ports:
+        - containerPort: 8881
+          name: verifier
+          protocol: TCP
+        # Keylime verifier doesn't have a health endpoint, use TCP probe
+        # Note: Keylime takes 30-40s to start (DB migrations + cert generation)
+        livenessProbe:
+          tcpSocket:
+            port: 8881
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          tcpSocket:
+            port: 8881
+          initialDelaySeconds: 45
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        resources:
+          {{- toYaml .Values.keylime.resources | nindent 10 }}
+        volumeMounts:
+        - name: config
+          mountPath: /etc/keylime/verifier.conf
+          subPath: verifier.conf
+          readOnly: true
+        - name: tls-certs
+          mountPath: /var/lib/keylime/cv_ca
+      volumes:
+      - name: config
+        configMap:
+          name: keylime-verifier-config
+      - name: tls-certs
+        emptyDir: {}
+{{- end }}

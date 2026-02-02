@@ -992,3 +992,161 @@ func createValidTPMObjects() (*tpm2.TPM2BPublic, *tpm2.TPM2BPrivate, *tpm2.Named
 
 	return &pub, priv, handle
 }
+
+// TestConvertPCRsToIntelFormat tests PCR blob generation without requiring TPM hardware
+func TestConvertPCRsToIntelFormat(t *testing.T) {
+	tests := []struct {
+		name             string
+		pcrSelection     *tpm2.TPMLPCRSelection
+		pcrValues        *tpm2.TPMLDigest
+		expectDigestCount int
+		wantErr          bool
+	}{
+		{
+			name: "24 PCRs selected (0-23) with SHA256 - split into 3 TPML_DIGEST",
+			pcrSelection: &tpm2.TPMLPCRSelection{
+				PCRSelections: []tpm2.TPMSPCRSelection{
+					{
+						Hash:      tpm2.TPMAlgSHA256,
+						PCRSelect: tpm2.PCClientCompatible.PCRs(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23),
+					},
+				},
+			},
+			pcrValues: &tpm2.TPMLDigest{
+				Digests: make([]tpm2.TPM2BDigest, 24), // 24 digests for 24 PCRs
+			},
+			expectDigestCount: 8, // Max 8 per TPML_DIGEST per TPM spec
+			wantErr:           false,
+		},
+		{
+			name: "8 PCRs selected (0-7) with SHA256",
+			pcrSelection: &tpm2.TPMLPCRSelection{
+				PCRSelections: []tpm2.TPMSPCRSelection{
+					{
+						Hash:      tpm2.TPMAlgSHA256,
+						PCRSelect: tpm2.PCClientCompatible.PCRs(0, 1, 2, 3, 4, 5, 6, 7),
+					},
+				},
+			},
+			pcrValues: &tpm2.TPMLDigest{
+				Digests: make([]tpm2.TPM2BDigest, 8),
+			},
+			expectDigestCount: 8,
+			wantErr:           false,
+		},
+		{
+			name: "multiple banks with different hash algorithms",
+			pcrSelection: &tpm2.TPMLPCRSelection{
+				PCRSelections: []tpm2.TPMSPCRSelection{
+					{
+						Hash:      tpm2.TPMAlgSHA256,
+						PCRSelect: tpm2.PCClientCompatible.PCRs(0, 1, 2, 3),
+					},
+					{
+						Hash:      tpm2.TPMAlgSHA384,
+						PCRSelect: tpm2.PCClientCompatible.PCRs(0, 1, 2, 3),
+					},
+				},
+			},
+			pcrValues: &tpm2.TPMLDigest{
+				Digests: make([]tpm2.TPM2BDigest, 8), // 4 + 4
+			},
+			expectDigestCount: 4, // 4 per bank
+			wantErr:           false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Fill digest values with test data
+			for i := range tt.pcrValues.Digests {
+				tt.pcrValues.Digests[i].Buffer = make([]byte, 32) // SHA256 size
+				// Put index in first byte for debugging
+				if len(tt.pcrValues.Digests[i].Buffer) > 0 {
+					tt.pcrValues.Digests[i].Buffer[0] = byte(i)
+				}
+			}
+
+			result, err := convertPCRsToIntelFormat(tt.pcrSelection, tt.pcrValues)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Greater(t, len(result), 0)
+
+			// Parse and validate the generated blob structure
+			offset := 0
+
+			// 1. TPML_PCR_SELECTION count
+			require.GreaterOrEqual(t, len(result), 4, "buffer too small for selection count")
+			selectionCount := uint32(result[0]) | uint32(result[1])<<8 | uint32(result[2])<<16 | uint32(result[3])<<24
+			require.Equal(t, uint32(len(tt.pcrSelection.PCRSelections)), selectionCount)
+			offset += 4
+
+			// 2. Fixed 16-entry array (8 bytes each = 128 bytes)
+			require.GreaterOrEqual(t, len(result), offset+128, "buffer too small for 16-entry selection array")
+			offset += 128
+
+			// 3. TPML_DIGEST count - now reflects total number of digest structures
+			// Each TPML_DIGEST can hold max 8 digests per TPM spec
+			require.GreaterOrEqual(t, len(result), offset+4, "buffer too small for digest count")
+			digestStructCount := uint32(result[offset]) | uint32(result[offset+1])<<8 | uint32(result[offset+2])<<16 | uint32(result[offset+3])<<24
+			offset += 4
+
+			// Calculate expected number of TPML_DIGEST structures
+			expectedStructs := 0
+			for _, sel := range tt.pcrSelection.PCRSelections {
+				selectedCount := 0
+				for pcrNum := 0; pcrNum < 24; pcrNum++ {
+					byteIdx := pcrNum / 8
+					bitIdx := pcrNum % 8
+					if byteIdx < len(sel.PCRSelect) && (sel.PCRSelect[byteIdx]&(1<<bitIdx)) != 0 {
+						selectedCount++
+					}
+				}
+				// Each TPML_DIGEST holds max 8 digests
+				expectedStructs += (selectedCount + 7) / 8
+			}
+			require.Equal(t, uint32(expectedStructs), digestStructCount, "should have correct number of TPML_DIGEST structures")
+
+			// 4. For each TPML_DIGEST structure, validate digest count and structure
+			totalDigestsProcessed := 0
+			for structIdx := 0; structIdx < int(digestStructCount); structIdx++ {
+				require.GreaterOrEqual(t, len(result), offset+4, "buffer too small for TPML_DIGEST %d count", structIdx)
+				structDigestCount := uint32(result[offset]) | uint32(result[offset+1])<<8 | uint32(result[offset+2])<<16 | uint32(result[offset+3])<<24
+				require.LessOrEqual(t, int(structDigestCount), 8, "TPML_DIGEST %d should have at most 8 digests, got %d", structIdx, structDigestCount)
+				offset += 4
+
+				// Validate each digest entry in this TPML_DIGEST
+				for digestIdx := 0; digestIdx < int(structDigestCount); digestIdx++ {
+					require.GreaterOrEqual(t, len(result), offset+2, "buffer too small for digest size at struct %d, digest %d", structIdx, digestIdx)
+					digestSize := uint16(result[offset]) | uint16(result[offset+1])<<8
+					offset += 2
+
+					// Digest value
+					require.GreaterOrEqual(t, len(result), offset+int(digestSize), "buffer too small for digest value at struct %d, digest %d", structIdx, digestIdx)
+					offset += int(digestSize)
+
+					// Padding to 64 bytes
+					padding := 64 - int(digestSize)
+					require.GreaterOrEqual(t, len(result), offset+padding, "buffer too small for digest padding at struct %d, digest %d", structIdx, digestIdx)
+					offset += padding
+
+					totalDigestsProcessed++
+				}
+			}
+
+			// Verify we processed all expected digests
+			require.Equal(t, len(tt.pcrValues.Digests), totalDigestsProcessed, "should process all provided digests")
+
+			// 5. Verify we consumed the entire buffer (no overrun, no leftover)
+			require.Equal(t, len(result), offset, "PCR blob should be fully consumed: got %d bytes, consumed %d bytes, remaining %d", len(result), offset, len(result)-offset)
+
+			t.Logf("✓ PCR blob structure validated: %d bytes, %d TPML_DIGEST structures, %d total digests (max %d per structure)", len(result), digestStructCount, totalDigestsProcessed, tt.expectDigestCount)
+		})
+	}
+}

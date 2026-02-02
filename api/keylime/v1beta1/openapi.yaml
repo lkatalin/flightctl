@@ -18,6 +18,37 @@ tags:
   - name: attestation
     description: Operations for TPM attestation verification via Keylime.
 paths:
+  /v2.4/verify/evidence:
+    post:
+      tags:
+        - attestation
+      description: Verify TPM attestation evidence (one-shot verification, v2.4 API)
+      operationId: verifyEvidence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEvidenceRequest'
+      responses:
+        "200":
+          description: Evidence verification completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyEvidenceResponse'
+        "400":
+          description: Bad Request - Invalid evidence data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v2.1/agents/{agent_id}:
     post:
       tags:
@@ -58,6 +89,88 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
+    VerifyEvidenceRequest:
+      type: object
+      description: Request to verify TPM evidence using v2.4 one-shot verification API (latest master branch format with nested data)
+      properties:
+        type:
+          type: string
+          description: Evidence type (always "tpm" for TPM attestation)
+          default: "tpm"
+        data:
+          type: object
+          description: Nested object containing all attestation data parameters
+          properties:
+            quote:
+              type: string
+              description: Base64-encoded TPM quote data
+            nonce:
+              type: string
+              description: Base64-encoded challenge nonce
+            hash_alg:
+              type: string
+              description: Hash algorithm used
+              default: "sha256"
+            tpm_ek:
+              type: string
+              description: Base64-encoded Endorsement Key
+            tpm_ak:
+              type: string
+              description: Base64-encoded Attestation Key
+            tpm_policy:
+              type: string
+              description: TPM policy (JSON object as string)
+            runtime_policy:
+              type: string
+              description: IMA runtime policy (JSON object as string)
+            mb_policy:
+              type: string
+              description: Measured boot policy (JSON string)
+            ima_measurement_list:
+              type: string
+              description: IMA measurement log
+            mb_log:
+              type: string
+              description: Measured boot log
+          required:
+            - quote
+            - nonce
+            - hash_alg
+            - tpm_ak
+      required:
+        - type
+        - data
+    VerifyEvidenceResponse:
+      type: object
+      description: Response from v2.4 one-shot evidence verification (latest master branch format)
+      properties:
+        code:
+          type: integer
+          description: HTTP status code
+        status:
+          type: string
+          description: Status message
+        results:
+          type: object
+          description: Verification results
+          properties:
+            valid:
+              type: boolean
+              description: Whether the evidence passed verification (true=valid, false=invalid)
+            claims:
+              type: object
+              description: Claims extracted from the evidence
+              additionalProperties: true
+            failures:
+              type: array
+              description: List of validation failures (if any)
+              items:
+                type: object
+                additionalProperties: true
+      required:
+        - code
+        - status
+        - results
     AttestationVerificationRequest:
       type: object
       description: Request to verify TPM attestation data with the Keylime verifier
@@ -98,15 +211,65 @@ components:
         tpm_policy:
           type: string
           description: JSON-formatted TPM PCR policy
+        cloudagent_ip:
+          type: string
+          description: IP address or hostname of the agent (required by Keylime)
+        cloudagent_port:
+          type: integer
+          description: Port number of the agent (required by Keylime)
+          default: 9002
+        supported_version:
+          type: string
+          description: Supported Keylime protocol version
+          default: "2.1"
+        metadata:
+          type: string
+          description: Metadata about the agent as JSON string (required by Keylime)
+          default: "{}"
+        ima_sign_verification_keys:
+          type: string
+          description: IMA signature verification keys (required by Keylime)
+          default: ""
+        revocation_key:
+          type: string
+          description: Revocation key for the agent (required by Keylime)
+          default: ""
+        accept_tpm_hash_algs:
+          type: array
+          description: List of accepted TPM hash algorithms (required by Keylime)
+          items:
+            type: string
+          default: ["sha256"]
+        accept_tpm_encryption_algs:
+          type: array
+          description: List of accepted TPM encryption algorithms (required by Keylime)
+          items:
+            type: string
+          default: ["rsa", "ecc"]
+        accept_tpm_signing_algs:
+          type: array
+          description: List of accepted TPM signing algorithms (required by Keylime)
+          items:
+            type: string
+          default: ["rsassa", "rsapss", "ecdsa"]
       required:
         - aik_tpm
+        - cloudagent_ip
+        - cloudagent_port
+        - metadata
+        - ima_sign_verification_keys
+        - revocation_key
+        - accept_tpm_hash_algs
+        - accept_tpm_encryption_algs
+        - accept_tpm_signing_algs
     AttestationVerificationResponse:
       type: object
       description: Response from Keylime attestation verification
       properties:
         results:
-          type: string
-          description: Verification result status (e.g., "Success", "Failed")
+          type: object
+          description: Verification result details object
+          additionalProperties: true
       required:
         - results
     ErrorResponse:

@@ -685,6 +685,14 @@ func (o *GetOptions) handleListWithFetcher(
 
 func (o *GetOptions) getResourceList(ctx context.Context, c *client.Client, kind ResourceKind) (interface{}, error) {
 	switch kind {
+	case AttestationReferenceKind:
+		params := api.ListAttestationReferencesParams{
+			LabelSelector: util.ToPtrWithNilDefault(o.LabelSelector),
+			FieldSelector: util.ToPtrWithNilDefault(o.FieldSelector),
+			Limit:         util.ToPtrWithNilDefault(o.Limit),
+			Continue:      util.ToPtrWithNilDefault(o.Continue),
+		}
+		return c.ListAttestationReferencesWithResponse(ctx, &params)
 	case DeviceKind:
 		params := api.ListDevicesParams{
 			LabelSelector: util.ToPtrWithNilDefault(o.LabelSelector),

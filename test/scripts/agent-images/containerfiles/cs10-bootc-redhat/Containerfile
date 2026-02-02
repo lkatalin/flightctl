@@ -51,6 +51,36 @@ RUN echo -e '#!/bin/bash\necho "my site"' > /usr/lib/flightctl/custom-info.d/sit
     echo -e '#!/bin/bash\necho "no-show"' > /usr/lib/flightctl/custom-info.d/keyNotShown && \
     chmod 755 /usr/lib/flightctl/custom-info.d/*
 
+# Enable IMA (Integrity Measurement Architecture) for TPM attestation
+# This configures the kernel to extend IMA measurements to PCR 10
+# The systemd unit runs once on first boot to add kernel parameters
+# IMA is only enabled if attestation is enabled in the agent config
+RUN mkdir -p /etc/systemd/system && \
+    cat > /etc/systemd/system/flightctl-enable-ima.service << 'EOF'
+[Unit]
+Description=Enable IMA kernel parameters for FlightCTL attestation
+ConditionKernelCommandLine=!ima_policy
+Before=flightctl-agent.service
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c '\
+    # Check if attestation is enabled in the agent config \
+    if [ -f /etc/flightctl/config.yaml ] && grep -v "^[[:space:]]*#" /etc/flightctl/config.yaml | grep -q "attestation-enabled:[[:space:]]*true"; then \
+        echo "Attestation enabled - configuring IMA kernel parameters"; \
+        rpm-ostree kargs --append=ima_policy=tcb --append=ima_appraise=off && systemctl reboot; \
+    else \
+        echo "Attestation not enabled - skipping IMA configuration"; \
+    fi'
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+RUN systemctl enable flightctl-enable-ima.service
+
 
 ARG SOURCE_GIT_TAG
 ARG SOURCE_GIT_COMMIT

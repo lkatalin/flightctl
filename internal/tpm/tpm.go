@@ -178,12 +178,15 @@ func createPCRSelection(selection [3]byte) *tpm2.TPMLPCRSelection {
 	}
 }
 
-// createFullPCRSelection creates a PCR selection that includes all PCRs (0-23)
+// createFullPCRSelection creates a PCR selection of stable boot PCRs only
+// We quote only PCRs 0-7 (BIOS/firmware measurements) because:
+// 1. PCRs 0-7 are set during boot and don't change at runtime
+// 2. PCRs 8-15 include PCR 10 (IMA) which extends constantly - excluded
+// 3. IMA verification is handled through the IMA measurement list itself
+// 4. The tpmPolicy mask is 0x0 so Keylime won't verify these PCR values anyway
 func createFullPCRSelection() *tpm2.TPMLPCRSelection {
-	// PCRs 0-7 (all bits set)
-	// PCRs 8-15 (all bits set)
-	// PCRs 16-23 (all bits set)
-	return createPCRSelection([3]byte{0xFF, 0xFF, 0xFF})
+	// PCRs 0-7 only (first byte: 0xFF, rest: 0x00)
+	return createPCRSelection([3]byte{0xFF, 0x00, 0x00})
 }
 
 // convertTPMLPCRSelectionToPCRSelection converts tpm2.TPMLPCRSelection to tpm2.PCRSelection

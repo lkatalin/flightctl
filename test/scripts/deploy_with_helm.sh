@@ -89,6 +89,12 @@ SERVICE_IMAGE_ARGS="$SERVICE_IMAGE_ARGS --set telemetryGateway.image.image=${TEL
 SERVICE_IMAGE_ARGS="$SERVICE_IMAGE_ARGS --set imageBuilderApi.image.image=${IMAGEBUILDER_API_IMAGE} --set imageBuilderApi.image.tag=latest"
 SERVICE_IMAGE_ARGS="$SERVICE_IMAGE_ARGS --set imageBuilderWorker.image.image=${IMAGEBUILDER_WORKER_IMAGE} --set imageBuilderWorker.image.tag=latest"
 
+# Support for additional values files (e.g., for attestation-demo)
+EXTRA_VALUES_ARG=""
+if [ ! -z "$EXTRA_VALUES_FILE" ]; then
+  EXTRA_VALUES_ARG="--values ${EXTRA_VALUES_FILE}"
+fi
+
 # helm expects the namespaces to exist, and creating namespaces
 # inside the helm charts is not recommended.
 kubectl create namespace flightctl-external --context kind-kind 2>/dev/null || true
@@ -137,6 +143,7 @@ helm dependency build ./deploy/helm/flightctl
 
 helm upgrade --install --namespace flightctl-external \
                   --values ./deploy/helm/flightctl/values.dev.yaml \
+                  ${EXTRA_VALUES_ARG} \
                   --set global.baseDomain=${IP}.nip.io \
                   ${ONLY_DB} ${DB_SIZE_PARAMS} ${AUTH_ARGS} ${SQL_ARG} ${GATEWAY_ARGS} ${KV_ARG} ${SERVICE_IMAGE_ARGS} flightctl \
               ./deploy/helm/flightctl/ --kube-context kind-kind
@@ -145,6 +152,12 @@ helm upgrade --install --namespace flightctl-external \
 
 # Wait for Redis deployment to be ready
 kubectl rollout status deployment flightctl-kv -n flightctl-internal -w --timeout=300s --context kind-kind
+
+# Wait for Keylime verifier if attestation demo is enabled
+if [ ! -z "$EXTRA_VALUES_FILE" ] && [[ "$EXTRA_VALUES_FILE" == *"attestation-demo"* ]]; then
+  echo "Waiting for Keylime verifier deployment to be ready..."
+  kubectl rollout status deployment keylime-verifier -n flightctl-external -w --timeout=300s --context kind-kind
+fi
 
 # Make sure the database is usable from the unit tests
 DB_POD=$(kubectl get pod -n flightctl-internal -l flightctl.service=flightctl-db --no-headers -o custom-columns=":metadata.name" --context kind-kind )

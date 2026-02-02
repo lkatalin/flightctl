@@ -183,7 +183,7 @@ func TestClient_Public(t *testing.T) {
 				pub := createTestTPM2BPublicRSA(t)
 				mockSession.EXPECT().GetPublicKey(LDevID).Return(pub, nil)
 			},
-			expectError: false, // convertTPM2BPublicToPublicKey should succeed for RSA too
+			expectError: false, // ConvertTPM2BPublicToPublicKey should succeed for RSA too
 		},
 	}
 
