@@ -51,6 +51,8 @@ func (f *TableFormatter) Format(data interface{}, options FormatOptions) error {
 // formatList handles formatting for list endpoints (TYPE)
 func (f *TableFormatter) formatList(w *tabwriter.Writer, data interface{}, options FormatOptions) error {
 	switch {
+	case strings.EqualFold(options.Kind, api.AttestationReferenceKind):
+		return f.printAttestationReferencesTable(w, data.(*apiclient.ListAttestationReferencesResponse).JSON200.Items...)
 	case strings.EqualFold(options.Kind, api.DeviceKind):
 		if options.SummaryOnly {
 			return f.printDevicesSummaryTable(w, data.(*apiclient.ListDevicesResponse).JSON200.Summary)
@@ -112,6 +114,8 @@ func (f *TableFormatter) formatList(w *tabwriter.Writer, data interface{}, optio
 // formatSingle handles formatting for single resource endpoints (TYPE/NAME)
 func (f *TableFormatter) formatSingle(w *tabwriter.Writer, data interface{}, options FormatOptions) error {
 	switch {
+	case strings.EqualFold(options.Kind, api.AttestationReferenceKind):
+		return f.printAttestationReferencesTable(w, *data.(*apiclient.GetAttestationReferenceResponse).JSON200)
 	case strings.EqualFold(options.Kind, api.DeviceKind):
 		if getLastSeenResponse, ok := data.(*apiclient.GetDeviceLastSeenResponse); ok {
 			// Check HTTP status code explicitly to distinguish between 204 (no content) and error responses
@@ -349,6 +353,40 @@ func (f *TableFormatter) printRepositoriesTable(w *tabwriter.Writer, repos ...ap
 			repoType,
 			util.DefaultIfError(r.Spec.GetRepoURL, ""),
 			accessible,
+		)
+	}
+	return nil
+}
+
+func (f *TableFormatter) printAttestationReferencesTable(w *tabwriter.Writer, refs ...api.AttestationReference) error {
+	f.printHeaderRowLn(w, "NAME", "MATCH-ALL", "TPM-POLICY", "RUNTIME-POLICY", "MB-POLICY")
+	for _, ref := range refs {
+		matchAll := "false"
+		if ref.Spec.MatchAll != nil && *ref.Spec.MatchAll {
+			matchAll = "true"
+		}
+
+		hasTpmPolicy := NoneString
+		if ref.Spec.TpmPolicy != nil && *ref.Spec.TpmPolicy != "" {
+			hasTpmPolicy = "configured"
+		}
+
+		hasRuntimePolicy := NoneString
+		if ref.Spec.RuntimePolicy != nil && *ref.Spec.RuntimePolicy != "" {
+			hasRuntimePolicy = "configured"
+		}
+
+		hasMbPolicy := NoneString
+		if ref.Spec.MbPolicy != nil && *ref.Spec.MbPolicy != "" {
+			hasMbPolicy = "configured"
+		}
+
+		f.printTableRowLn(w,
+			*ref.Metadata.Name,
+			matchAll,
+			hasTpmPolicy,
+			hasRuntimePolicy,
+			hasMbPolicy,
 		)
 	}
 	return nil

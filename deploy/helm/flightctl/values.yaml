@@ -295,7 +295,19 @@ alertmanagerProxy:
     tag: ""
     # -- Image pull policy for Alertmanager proxy container
     pullPolicy: ""
-  
+
+# -- Keylime Verifier Configuration
+keylime:
+  # -- Enable Keylime verifier service for TPM attestation
+  enabled: false
+  image:
+    # -- Keylime verifier container image repository
+    repository: quay.io/keylime/keylime_verifier
+    # -- Keylime verifier image tag
+    tag: "master"
+    # -- Image pull policy for Keylime verifier container
+    pullPolicy: IfNotPresent
+
 # -- ImageBuilder API Configuration
 imageBuilderApi:
   # -- Enable imagebuilder API service

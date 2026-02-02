@@ -109,7 +109,7 @@ func (c *client) Public() crypto.PublicKey {
 	}
 
 	// convert TPM2BPublic to crypto.PublicKey
-	pubKey, err := convertTPM2BPublicToPublicKey(pub)
+	pubKey, err := ConvertTPM2BPublicToPublicKey(pub)
 	if err != nil {
 		c.log.Errorf("Failed to convert TPM public key: %v", err)
 		return nil
@@ -389,7 +389,7 @@ func (c *client) GetHashAlgorithm() string {
 }
 
 // convertTPM2BPublicToECDSA converts a TPM2BPublic to a public key.
-func convertTPM2BPublicToPublicKey(pub *tpm2.TPM2BPublic) (crypto.PublicKey, error) {
+func ConvertTPM2BPublicToPublicKey(pub *tpm2.TPM2BPublic) (crypto.PublicKey, error) {
 	outpub, err := pub.Contents()
 	if err != nil {
 		return nil, fmt.Errorf("could not get contents of TPM2BPublic: %w", err)

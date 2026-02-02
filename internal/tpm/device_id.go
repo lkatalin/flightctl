@@ -20,7 +20,7 @@ type exportableDeviceID struct {
 }
 
 func (e *exportableDeviceID) Public() crypto.PublicKey {
-	pub, err := convertTPM2BPublicToPublicKey(&e.pub)
+	pub, err := ConvertTPM2BPublicToPublicKey(&e.pub)
 	if err != nil {
 		e.log.Errorf("Failed to convert tpm blob to public key: %v", err)
 		return nil

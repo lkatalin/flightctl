@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"strings"
@@ -21,9 +23,161 @@ import (
 	"github.com/flightctl/flightctl/internal/store/selector"
 	"github.com/flightctl/flightctl/internal/tpm"
 	"github.com/flightctl/flightctl/internal/util"
+	"github.com/google/go-tpm/tpm2"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 )
+
+// stripTPM2BPrefix removes the 2-byte TPM2B length prefix from a base64-encoded blob
+// TPM2B structures have a 2-byte length field, but Keylime expects raw structures without this wrapper
+func stripTPM2BPrefix(base64Blob string) string {
+	// Decode from base64
+	data, err := base64.StdEncoding.DecodeString(base64Blob)
+	if err != nil || len(data) < 2 {
+		// If decode fails or data is too short, return original
+		return base64Blob
+	}
+
+	// Strip first 2 bytes (TPM2B length prefix)
+	strippedData := data[2:]
+
+	// Re-encode to base64
+	return base64.StdEncoding.EncodeToString(strippedData)
+}
+
+// parsePCRSelectionFromQuote extracts the PCR selection bitmask from the TPM quote
+// The quote format is "quote:signature:pcr" where pcr contains TPML_PCR_SELECTION structure
+// Returns the list of PCR numbers that are included in the quote
+func parsePCRSelectionFromQuote(quoteParts []string) ([]int, error) {
+	if len(quoteParts) != 3 {
+		return nil, fmt.Errorf("invalid quote format, expected 3 parts")
+	}
+
+	// Decode the PCR data (third part)
+	pcrData, err := base64.StdEncoding.DecodeString(quoteParts[2])
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode PCR data: %w", err)
+	}
+
+	// Parse the Intel format PCR structure
+	// Format: count (4 bytes LE), then 16 TPMS_PCR_SELECTION entries
+	// Each entry: hash_alg (2 bytes LE), size_of_select (1 byte), pcr_select (3 bytes), padding (2 bytes)
+	if len(pcrData) < 4 {
+		return nil, fmt.Errorf("PCR data too short")
+	}
+
+	// Read count (first 4 bytes, little-endian)
+	count := uint32(pcrData[0]) | uint32(pcrData[1])<<8 | uint32(pcrData[2])<<16 | uint32(pcrData[3])<<24
+	if count == 0 {
+		return nil, nil // No PCR selections
+	}
+
+	pcrs := make([]int, 0)
+	offset := 4 // Skip count field
+
+	// Parse first PCR selection (we expect SHA256 bank)
+	// Each entry is 8 bytes: hash_alg (2), size_of_select (1), pcr_select (3), padding (2)
+	if len(pcrData) < offset+8 {
+		return nil, fmt.Errorf("PCR data too short for selection entry")
+	}
+
+	// Read hash algorithm (2 bytes, little-endian)
+	// hashAlg := uint16(pcrData[offset]) | uint16(pcrData[offset+1])<<8
+
+	// Read size of select (1 byte)
+	sizeOfSelect := int(pcrData[offset+2])
+
+	// Read PCR select bitmask (3 bytes)
+	if sizeOfSelect >= 3 && len(pcrData) >= offset+6 {
+		pcrSelect := [3]byte{pcrData[offset+3], pcrData[offset+4], pcrData[offset+5]}
+
+		// Extract PCR numbers from bitmask
+		for pcrNum := 0; pcrNum < 24; pcrNum++ {
+			byteIdx := pcrNum / 8
+			bitIdx := pcrNum % 8
+			if (pcrSelect[byteIdx] & (1 << bitIdx)) != 0 {
+				pcrs = append(pcrs, pcrNum)
+			}
+		}
+	}
+
+	return pcrs, nil
+}
+
+// buildTPMPolicyFromPCRs constructs a TPM policy JSON with appropriate mask for the given PCRs
+func buildTPMPolicyFromPCRs(pcrs []int, existingPolicy *string) (string, error) {
+	// If there's an existing policy, try to merge with it
+	var policyMap map[string]interface{}
+	if existingPolicy != nil && *existingPolicy != "" {
+		if err := json.Unmarshal([]byte(*existingPolicy), &policyMap); err != nil {
+			// If existing policy is invalid, start fresh
+			policyMap = make(map[string]interface{})
+		}
+	} else {
+		policyMap = make(map[string]interface{})
+	}
+
+	// Calculate mask based on PCRs present in the quote
+	// Mask is a hex string where each bit represents a PCR
+	if len(pcrs) == 0 {
+		// No PCRs in quote - use mask 0x0
+		policyMap["mask"] = "0x0"
+	} else {
+		// Calculate mask value from PCR list
+		mask := uint32(0)
+		for _, pcrNum := range pcrs {
+			if pcrNum >= 0 && pcrNum < 32 {
+				mask |= (1 << uint(pcrNum))
+			}
+		}
+		policyMap["mask"] = fmt.Sprintf("0x%x", mask)
+	}
+
+	// Marshal back to JSON
+	policyJSON, err := json.Marshal(policyMap)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal TPM policy: %w", err)
+	}
+
+	return string(policyJSON), nil
+}
+
+// convertTPM2BPublicToPEM converts a base64-encoded TPM2B_PUBLIC to PEM format
+// Keylime expects the AK in PEM format, not raw TPM2B_PUBLIC format
+func convertTPM2BPublicToPEM(base64TPM2BPublic string) (string, error) {
+	// Decode base64 to get TPM2B_PUBLIC bytes
+	tpm2bBytes, err := base64.StdEncoding.DecodeString(base64TPM2BPublic)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode base64 TPM2B_PUBLIC: %w", err)
+	}
+
+	// Unmarshal TPM2B_PUBLIC
+	tpm2bPublic, err := tpm2.Unmarshal[tpm2.TPM2BPublic](tpm2bBytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to unmarshal TPM2B_PUBLIC: %w", err)
+	}
+
+	// Convert TPM2B_PUBLIC to crypto.PublicKey
+	pubKey, err := tpm.ConvertTPM2BPublicToPublicKey(tpm2bPublic)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert TPM2B_PUBLIC to crypto.PublicKey: %w", err)
+	}
+
+	// Marshal to PKIX format (standard public key format)
+	pkixBytes, err := x509.MarshalPKIXPublicKey(pubKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal public key to PKIX: %w", err)
+	}
+
+	// Encode to PEM format
+	pemBlock := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: pkixBytes,
+	}
+	pemBytes := pem.EncodeToMemory(pemBlock)
+
+	return string(pemBytes), nil
+}
 
 // getTPMCAPool loads the TPM CA certificates from configured paths
 func (h *ServiceHandler) getTPMCAPool() *x509.CertPool {
@@ -66,9 +220,17 @@ func (h *ServiceHandler) verifyTPMEnrollmentRequest(er *domain.EnrollmentRequest
 
 // processAttestationWithKeylime sends attestation data to Keylime verifier and updates enrollment request status
 func (h *ServiceHandler) processAttestationWithKeylime(ctx context.Context, orgId uuid.UUID, attestationPkg *AttestationPackage, er *domain.EnrollmentRequest) error {
-	// Skip if Keylime client is not configured
+	// Skip if Keylime client is not configured (MOCK MODE)
 	if h.keylimeClient == nil {
-		h.log.Debug("Keylime client not configured, skipping attestation verification")
+		h.log.Warnf("⚠️  ATTESTATION MOCK MODE: Keylime verifier not enabled - skipping TPM attestation verification for device %s. THIS IS INSECURE AND SHOULD NOT BE USED IN PRODUCTION!", attestationPkg.Metadata.EnrollmentRequestName)
+		// Add a condition to the enrollment request to indicate mock mode
+		condition := domain.Condition{
+			Type:    domain.ConditionTypeEnrollmentRequestAttestationVerified,
+			Status:  domain.ConditionStatusTrue,
+			Reason:  "AttestationMockMode",
+			Message: "WARNING: Attestation verification skipped (mock mode - Keylime not enabled)",
+		}
+		domain.SetStatusCondition(&er.Status.Conditions, condition)
 		return nil
 	}
 
@@ -99,20 +261,136 @@ func (h *ServiceHandler) processAttestationWithKeylime(ctx context.Context, orgI
 		return nil
 	}
 
+	// Check if TPM Quote is present (required for v2.4 one-shot verification)
+	if attestationPkg.Data.Quote == nil || *attestationPkg.Data.Quote == "" {
+		h.log.Warnf("Attestation package for %s missing required TPM Quote", attestationPkg.Metadata.EnrollmentRequestName)
+		condition := domain.Condition{
+			Type:    domain.ConditionTypeEnrollmentRequestAttestationVerified,
+			Status:  domain.ConditionStatusFalse,
+			Reason:  "AttestationDataIncomplete",
+			Message: "Missing required TPM Quote in attestation data - ensure agent has TPM enabled and collected quote",
+		}
+		domain.SetStatusCondition(&er.Status.Conditions, condition)
+		return nil
+	}
+
+	// Check if Nonce is present (required for v2.4 one-shot verification)
+	if attestationPkg.Data.Nonce == nil || *attestationPkg.Data.Nonce == "" {
+		h.log.Warnf("Attestation package for %s missing required Nonce", attestationPkg.Metadata.EnrollmentRequestName)
+		condition := domain.Condition{
+			Type:    domain.ConditionTypeEnrollmentRequestAttestationVerified,
+			Status:  domain.ConditionStatusFalse,
+			Reason:  "AttestationDataIncomplete",
+			Message: "Missing required Nonce in attestation data - ensure agent collected nonce for quote freshness",
+		}
+		domain.SetStatusCondition(&er.Status.Conditions, condition)
+		return nil
+	}
+
 	// Use enrollment request name as device ID
 	deviceID := attestationPkg.Metadata.EnrollmentRequestName
 
+	h.log.Debugf("Attestation data for %s: has Quote=%v (%d bytes), has Nonce=%v (%d bytes), has TpmAk=%v, has TpmEk=%v",
+		deviceID,
+		attestationPkg.Data.Quote != nil, len(*attestationPkg.Data.Quote),
+		attestationPkg.Data.Nonce != nil, len(*attestationPkg.Data.Nonce),
+		attestationPkg.Data.TpmAk != nil,
+		attestationPkg.Data.TpmEk != nil)
+
 	h.log.Infof("Verifying attestation for device %s with Keylime verifier using AttestationReference %s", deviceID, *attestationRef.Metadata.Name)
 
-	// Call the Keylime verifier (blocking call)
+	// Keylime expects the quote in format: "r<quote>:<signature>:<pcr>" (with "r" prefix indicating TPM 2.0)
+	// The agent sends quote:signature:pcr
+	var keylimeQuote *string
+	if attestationPkg.Data.Quote != nil {
+		quoteStr := *attestationPkg.Data.Quote
+
+		// Check if quote already has "r" or "r:" prefix (for compatibility)
+		if strings.HasPrefix(quoteStr, "r:") {
+			quoteStr = quoteStr[2:] // Remove "r:" prefix temporarily for processing
+		} else if strings.HasPrefix(quoteStr, "r") {
+			quoteStr = quoteStr[1:] // Remove "r" prefix temporarily for processing
+		}
+
+		// Split quote into components: quote:signature:pcr
+		parts := strings.Split(quoteStr, ":")
+		var quoteParts []string
+		if len(parts) != 3 {
+			h.log.Warnf("Unexpected quote format, expected 3 parts (quote:signature:pcr), got %d parts", len(parts))
+			formattedQuote := "r" + *attestationPkg.Data.Quote
+			keylimeQuote = &formattedQuote
+			// Can't parse PCRs from malformed quote
+			quoteParts = nil
+		} else {
+			quoteParts = parts
+
+			// Decode each part to check actual binary sizes
+			quoteBytes, err1 := base64.StdEncoding.DecodeString(parts[0])
+			sigBytes, err2 := base64.StdEncoding.DecodeString(parts[1])
+			pcrBytes, err3 := base64.StdEncoding.DecodeString(parts[2])
+
+			if err1 == nil && err2 == nil && err3 == nil {
+				h.log.Infof("Quote component sizes (decoded): quote=%d bytes, sig=%d bytes, pcr=%d bytes",
+					len(quoteBytes), len(sigBytes), len(pcrBytes))
+				// Log first few bytes of each to debug format
+				if len(quoteBytes) >= 4 {
+					h.log.Infof("Quote first 4 bytes (hex): %02x %02x %02x %02x (should be ff 54 43 47 = TPM_GENERATED_VALUE)",
+						quoteBytes[0], quoteBytes[1], quoteBytes[2], quoteBytes[3])
+				}
+				if len(sigBytes) >= 4 {
+					h.log.Infof("Signature first 4 bytes (hex): %02x %02x %02x %02x",
+						sigBytes[0], sigBytes[1], sigBytes[2], sigBytes[3])
+				}
+			} else {
+				h.log.Warnf("Failed to decode quote components: quote_err=%v, sig_err=%v, pcr_err=%v", err1, err2, err3)
+			}
+
+			// Agent already sends quote/signature/pcr in correct format
+			// Quote is TPMS_ATTEST (starts with magic 0xFF544347)
+			// Signature is TPMT_SIGNATURE
+			// No TPM2B wrappers to strip - just prepend "r" prefix
+			formattedQuote := "r" + parts[0] + ":" + parts[1] + ":" + parts[2]
+			keylimeQuote = &formattedQuote
+			h.log.Infof("Sending quote to Keylime (no stripping needed): total %d chars", len(formattedQuote))
+		}
+
+		// Parse PCRs from the quote to dynamically construct TPM policy mask
+		if quoteParts != nil {
+			pcrs, err := parsePCRSelectionFromQuote(quoteParts)
+			if err != nil {
+				h.log.Warnf("Failed to parse PCR selection from quote: %v", err)
+			} else {
+				h.log.Infof("Detected %d PCRs in quote: %v", len(pcrs), pcrs)
+
+				// Build TPM policy with mask matching the PCRs in the quote
+				dynamicPolicy, err := buildTPMPolicyFromPCRs(pcrs, attestationRef.Spec.TpmPolicy)
+				if err != nil {
+					h.log.Warnf("Failed to build dynamic TPM policy: %v", err)
+				} else {
+					h.log.Infof("Using dynamic TPM policy based on quote PCRs: %s", dynamicPolicy)
+					// Override the TPM policy with dynamically constructed one
+					attestationRef.Spec.TpmPolicy = &dynamicPolicy
+				}
+			}
+		}
+	}
+
+	// Call the Keylime verifier for one-shot verification (v2.5 API)
+	// Note: Keylime's _tpm2_checkquote() expects base64-encoded TPM2B_PUBLIC,
+	// which it internally converts to PEM before passing to the low-level checkquote() function.
+	// The agent already sends TPM2B_PUBLIC in base64 format, so we pass it directly.
 	resultStatus, err := h.keylimeClient.VerifyAttestation(
 		ctx,
 		deviceID,
 		*attestationPkg.Data.TpmAk,
 		attestationPkg.Data.TpmEk,
+		keylimeQuote,
+		attestationPkg.Data.Nonce,
 		attestationRef.Spec.MbPolicy,
 		attestationRef.Spec.RuntimePolicy,
 		attestationRef.Spec.TpmPolicy,
+		attestationPkg.Data.ImaMeasurementList,
+		attestationPkg.Data.MbLog,
 	)
 	if err != nil {
 		h.log.Errorf("Keylime attestation verification failed for %s: %v", deviceID, err)

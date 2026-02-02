@@ -257,6 +257,8 @@ func (o *DeleteOptions) deleteOne(ctx context.Context, c *client.Client, kind Re
 	var err error
 
 	switch kind {
+	case AttestationReferenceKind:
+		response, err = c.DeleteAttestationReferenceWithResponse(ctx, name)
 	case DeviceKind:
 		response, err = c.DeleteDeviceWithResponse(ctx, name)
 	case EnrollmentRequestKind:

@@ -321,6 +321,8 @@ func responseField[T any](response interface{}, name string) (T, error) {
 // GetSingleResource fetches a single resource by kind and name.
 func GetSingleResource(ctx context.Context, c *client.Client, kind ResourceKind, name string) (interface{}, error) {
 	switch kind {
+	case AttestationReferenceKind:
+		return c.GetAttestationReferenceWithResponse(ctx, name)
 	case DeviceKind:
 		return c.GetDeviceWithResponse(ctx, name)
 	case EnrollmentRequestKind:

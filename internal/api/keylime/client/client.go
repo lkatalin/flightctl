@@ -3,10 +3,14 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	keylimeapi "github.com/flightctl/flightctl/api/keylime/v1beta1"
@@ -22,42 +26,144 @@ type Client struct {
 
 // NewClient creates a new Keylime verifier client
 func NewClient(baseURL string, log logrus.FieldLogger) *Client {
+	// Create HTTP client with TLS configuration
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true, // #nosec G402 - required for demo with self-signed certs
+	}
+
+	// Load client certificates if available (for mTLS with Keylime)
+	// Certificates are mounted from Kubernetes Secret if available
+	clientCertPath := "/etc/flightctl/keylime/client.crt"
+	clientKeyPath := "/etc/flightctl/keylime/client.key"
+	caCertPath := "/etc/flightctl/keylime/ca.crt"
+
+	if fileExists(clientCertPath) && fileExists(clientKeyPath) {
+		cert, err := tls.LoadX509KeyPair(clientCertPath, clientKeyPath)
+		if err != nil {
+			log.Warnf("Failed to load Keylime client certificates from %s and %s: %v", clientCertPath, clientKeyPath, err)
+		} else {
+			tlsConfig.Certificates = []tls.Certificate{cert}
+			log.Infof("Loaded Keylime client certificates for mTLS")
+
+			// Load CA certificate if available
+			if fileExists(caCertPath) {
+				caCert, err := os.ReadFile(caCertPath)
+				if err != nil {
+					log.Warnf("Failed to read Keylime CA certificate from %s: %v", caCertPath, err)
+				} else {
+					caCertPool := x509.NewCertPool()
+					if caCertPool.AppendCertsFromPEM(caCert) {
+						tlsConfig.RootCAs = caCertPool
+						// Keylime's auto-generated certificates use "server" as the hostname
+						// Override ServerName to match the certificate instead of the DNS name
+						tlsConfig.ServerName = "server"
+						tlsConfig.InsecureSkipVerify = false // Use proper verification with CA
+						log.Infof("Loaded Keylime CA certificate, TLS verification enabled with ServerName=server")
+					}
+				}
+			}
+		}
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
 	return &Client{
 		baseURL: baseURL,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:   30 * time.Second,
+			Transport: tr,
 		},
 		log: log,
 	}
 }
 
-// VerifyAttestation sends TPM attestation data to the Keylime verifier for verification.
-// This is a blocking call that waits for the verifier to complete verification.
-// Returns the verification result status string ("Success" or error details) and any error.
-func (c *Client) VerifyAttestation(ctx context.Context, deviceID string, aikTpm string, ekTpm *string, mbPolicy, runtimePolicy, tpmPolicy *string) (string, error) {
-	url := fmt.Sprintf("%s/v2.1/agents/%s", c.baseURL, deviceID)
+// fileExists checks if a file exists
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
 
-	req := keylimeapi.AttestationVerificationRequest{
-		AikTpm: aikTpm,
+// VerifyAttestation sends TPM attestation data to the Keylime verifier for one-shot verification.
+// Uses the /v2.5/verify/evidence endpoint which does NOT require agent registration or polling.
+// This is a blocking call that returns immediate verification results.
+// Returns the verification result status string ("Success" or error details) and any error.
+func (c *Client) VerifyAttestation(ctx context.Context, deviceID string, aikTpm string, ekTpm *string, quote, nonce *string, mbPolicy, runtimePolicy, tpmPolicy *string, imaMeasurementList, mbLog *string) (string, error) {
+	url := fmt.Sprintf("%s/v2.5/verify/evidence", c.baseURL)
+
+	// v2.5 API requires quote and nonce for one-shot verification
+	if quote == nil || *quote == "" {
+		return "", fmt.Errorf("TPM quote is required for verification")
 	}
+	if nonce == nil || *nonce == "" {
+		return "", fmt.Errorf("nonce is required for verification")
+	}
+
+	// Debug: Log quote format for debugging "Invalid quote type A" error
+	quotePrefix := *quote
+	if len(quotePrefix) > 20 {
+		quotePrefix = quotePrefix[:20]
+	}
+	c.log.Infof("Quote data prefix (first 20 chars): %s", quotePrefix)
+	c.log.Infof("Quote length: %d bytes", len(*quote))
+
+	// Build request with nested data structure (Keylime master branch format)
+	// The latest Keylime expects all attestation parameters nested under a "data" object
+	req := keylimeapi.VerifyEvidenceRequest{
+		Type: "tpm",
+	}
+
+	// Populate the nested Data object
+	req.Data.Quote = *quote
+	req.Data.Nonce = *nonce
+	req.Data.HashAlg = "sha256" // Default hash algorithm
+	req.Data.TpmAk = aikTpm
 
 	if ekTpm != nil {
-		req.EkTpm = ekTpm
+		req.Data.TpmEk = ekTpm
 	}
-	if mbPolicy != nil {
-		req.MbPolicy = mbPolicy
+	if tpmPolicy != nil && *tpmPolicy != "" {
+		req.Data.TpmPolicy = tpmPolicy
+	} else {
+		// Default TPM policy with mask 0x0 (no PCR verification for demo)
+		defaultPolicy := `{"mask":"0x0"}`
+		req.Data.TpmPolicy = &defaultPolicy
 	}
-	if runtimePolicy != nil {
-		req.RuntimePolicy = runtimePolicy
+	if runtimePolicy != nil && *runtimePolicy != "" {
+		req.Data.RuntimePolicy = runtimePolicy
 	}
-	if tpmPolicy != nil {
-		req.TpmPolicy = tpmPolicy
+	// Only send mbPolicy and mbLog if we have a non-empty measured boot policy
+	// Check if mbPolicy is effectively empty (nil, empty string, or empty JSON object)
+	mbPolicyIsEmpty := mbPolicy == nil || *mbPolicy == ""
+	if !mbPolicyIsEmpty {
+		// Trim whitespace and check if it's an empty JSON object
+		trimmed := strings.TrimSpace(*mbPolicy)
+		if trimmed == "{}" || trimmed == "" {
+			mbPolicyIsEmpty = true
+		}
+	}
+
+	if !mbPolicyIsEmpty {
+		req.Data.MbPolicy = mbPolicy
+		// Only send measured boot log if we have a measured boot policy
+		// Otherwise Keylime will parse it and fail on warnings without policy guidance
+		if mbLog != nil {
+			req.Data.MbLog = mbLog
+		}
+	}
+	if imaMeasurementList != nil {
+		req.Data.ImaMeasurementList = imaMeasurementList
 	}
 
 	body, err := json.Marshal(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
+
+	// Debug: Log the request being sent to Keylime
+	c.log.Infof("Sending request to Keylime v2.5 API at %s", url)
+	c.log.Infof("Request body size: %d bytes", len(body))
+	c.log.Infof("Request JSON: %s", string(body))
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
@@ -79,22 +185,40 @@ func (c *Client) VerifyAttestation(ctx context.Context, deviceID string, aikTpm 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		var errResp keylimeapi.ErrorResponse
-		if err := json.Unmarshal(respBody, &errResp); err == nil {
-			statusMsg := "unknown"
-			if errResp.Status != nil {
-				statusMsg = *errResp.Status
-			}
-			return "", fmt.Errorf("keylime verifier returned error (status %d): %s", resp.StatusCode, statusMsg)
-		}
 		return "", fmt.Errorf("keylime verifier returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	var response keylimeapi.AttestationVerificationResponse
+	// Debug: Log raw response from Keylime
+	c.log.Infof("Raw Keylime response: %s", string(respBody))
+
+	var response keylimeapi.VerifyEvidenceResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
 		return "", fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	c.log.Infof("Keylime verifier completed attestation verification for device %s: %s", deviceID, response.Results)
-	return response.Results, nil
+	// Valid is a bool pointer: true = valid, false = invalid
+	validBool := response.Results.Valid != nil && *response.Results.Valid
+	c.log.Infof("Keylime verifier completed one-shot attestation for device %s: valid=%v", deviceID, validBool)
+	if response.Results.Failures != nil {
+		c.log.Infof("Failures array length: %d", len(*response.Results.Failures))
+		c.log.Infof("Failures content: %+v", *response.Results.Failures)
+	} else {
+		c.log.Infof("Failures is nil")
+	}
+
+	// Check if validation succeeded
+	if validBool {
+		return "Success", nil
+	}
+
+	// Validation failed - format failure details
+	if response.Results.Failures != nil && len(*response.Results.Failures) > 0 {
+		failuresJSON, err := json.Marshal(*response.Results.Failures)
+		if err != nil {
+			return "", fmt.Errorf("attestation failed with %d validation failures", len(*response.Results.Failures))
+		}
+		return "", fmt.Errorf("attestation validation failed: %s", string(failuresJSON))
+	}
+
+	return "", fmt.Errorf("attestation validation failed (no failure details provided)")
 }

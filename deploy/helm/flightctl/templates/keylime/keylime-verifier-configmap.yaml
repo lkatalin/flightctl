@@ -1,0 +1,93 @@
+{{- if .Values.keylime.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keylime-verifier-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "flightctl.standardLabels" . | nindent 4 }}
+data:
+  verifier.conf: |
+    # Keylime Verifier Configuration
+    # Auto-generated for FlightCTL attestation demo
+
+    [verifier]
+    version = 2.5
+    uuid = default
+
+    # Network configuration (overridden by environment variables)
+    ip = "127.0.0.1"
+    port = 8881
+
+    # Registrar connection
+    registrar_ip = 127.0.0.1
+    registrar_port = 8891
+
+    # DISABLE mTLS for demo environment
+    # This allows FlightCTL to connect without client certificates
+    # WARNING: Set to True in production!
+    enable_agent_mtls = False
+
+    # TLS certificate directory
+    # Use 'default' (not 'generate') to allow trusted_client_ca = all
+    # 'generate' mode requires all TLS options to be 'default'
+    tls_dir = default
+    server_key = default
+    server_key_password =
+    server_cert = default
+    # Use 'all' keyword to disable client certificate verification
+    # This allows connections without client certificates (demo only!)
+    trusted_client_ca = all
+    client_key = default
+    client_key_password =
+    client_cert = default
+    trusted_server_ca = default
+
+    # Database configuration
+    database_url = sqlite
+    database_pool_sz_ovfl = 5,10
+    auto_migrate_db = True
+
+    # Worker and retry settings
+    num_workers = 0
+    exponential_backoff = True
+    retry_interval = 2
+    max_retries = 5
+    quote_interval = 2
+
+    # Request limits
+    max_upload_size = 104857600
+    request_timeout = 60.0
+
+    # Measured boot policy
+    measured_boot_policy_name = accept-all
+    measured_boot_imports = []
+    measured_boot_evaluate = once
+
+    # Severity configuration
+    severity_labels = ["info", "notice", "warning", "error", "critical", "alert", "emergency"]
+    severity_policy = [{"event_id": ".*", "severity_label": "emergency"}]
+
+    # Additional Keylime configuration options
+    ignore_tomtou_errors = False
+    durable_attestation_import =
+    persistent_store_url =
+    transparency_log_url =
+    time_stamp_authority_url =
+    time_stamp_authority_certs_path =
+    persistent_store_format = json
+    persistent_store_encoding =
+    transparency_log_sign_algo = sha256
+    signed_attributes =
+    require_allow_list_signatures = False
+
+    [revocations]
+    # Revocation notification methods
+    enabled_revocation_notifications = ['agent']
+    zmq_ip = 127.0.0.1
+    zmq_port = 8992
+    webhook_url =
+    mode =
+    challenge_lifetime =
+    verification_timeout =
+{{- end }}

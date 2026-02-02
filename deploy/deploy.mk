@@ -61,6 +61,9 @@ deploy-helm:
 prepare-agent-config:
 	test/scripts/agent-images/prepare_agent_config.sh --status-update-interval $(STATUS_UPDATE_INTERVAL) --spec-fetch-interval $(SPEC_FETCH_INTERVAL)
 
+prepare-agent-config-attestation:
+	test/scripts/agent-images/prepare_agent_config.sh --status-update-interval $(STATUS_UPDATE_INTERVAL) --spec-fetch-interval $(SPEC_FETCH_INTERVAL) --tpm-attestation-enabled
+
 deploy-db-helm: cluster
 	test/scripts/deploy_with_helm.sh --only-db
 
@@ -144,4 +147,138 @@ clean-services-container:
 	sudo podman rm flightctl-services || true
 	sudo podman rmi localhost/flightctl-services:latest || true
 
-PHONY: deploy-db deploy cluster services-container run-services-container clean-services-container
+# Attestation demo deployment with official Keylime verifier
+ifndef SKIP_BUILD
+attestation-server: flightctl-api-container flightctl-db-setup-container flightctl-worker-container flightctl-periodic-container flightctl-alert-exporter-container flightctl-alertmanager-proxy-container flightctl-imagebuilder-api-container flightctl-imagebuilder-worker-container flightctl-multiarch-cli-container flightctl-telemetry-gateway-container
+else
+attestation-server:
+	@echo "Skipping container builds (SKIP_BUILD is set)"
+endif
+attestation-server: cluster build-cli
+	kubectl config set-context kind-kind
+	test/scripts/install_helm.sh
+	@echo "Loading custom Keylime verifier image into kind cluster..."
+	@if podman image exists localhost/keylime_verifier:master-3a3cfa9; then \
+		podman save localhost/keylime_verifier:master-3a3cfa9 | kind load image-archive /dev/stdin --name kind; \
+		echo "✓ Keylime verifier image loaded successfully"; \
+	else \
+		echo "⚠ Warning: localhost/keylime_verifier:master-3a3cfa9 not found in podman images"; \
+		echo "  The deployment may fail. Build it first or use the official image."; \
+	fi
+	@echo "Deploying with attestation demo configuration (custom Keylime verifier from master)..."
+	EXTRA_VALUES_FILE=./deploy/helm/flightctl/values.attestation-demo.yaml test/scripts/deploy_with_helm.sh --db-size $(DB_SIZE)
+	$(MAKE) configure-attestation-tpm-cas
+	@echo ""
+	@echo "=========================================="
+	@echo "Attestation Server Deployed!"
+	@echo "=========================================="
+	@echo ""
+	@echo "✓ FlightCTL API server configured for attestation"
+	@echo "✓ Custom Keylime verifier (master branch) deployed and running"
+	@echo "✓ TPM CA certificates configured"
+	@echo ""
+	@echo "Next step: Apply attestation policy with 'make attestation-policy'"
+
+# Wait for FlightCTL API server to be ready and configure CLI
+wait-for-server:
+	@echo "Waiting for FlightCTL API server to be ready..."
+	@kubectl rollout status deployment flightctl-api -n flightctl-external -w --timeout=300s
+	@echo "Configuring FlightCTL CLI authentication..."
+	@export FLIGHTCTL_NS=flightctl-external && \
+		bash -c 'source test/scripts/functions && \
+		for i in {1..60}; do \
+			if try_login; then \
+				echo "✓ CLI authenticated successfully"; \
+				exit 0; \
+			fi; \
+			if [ $$i -eq 60 ]; then \
+				echo "ERROR: Failed to authenticate CLI after 60 attempts"; \
+				exit 1; \
+			fi; \
+			sleep 5; \
+		done'
+	@bash -c 'source test/scripts/functions && ensure_organization_set'
+	@echo "✓ API server is ready and CLI is configured"
+
+# Apply example attestation policy (allowlist format)
+attestation-policy:
+	@echo "Applying AttestationReference from measurements.txt..."
+	bin/flightctl apply -f examples/attestation/attestation-reference-from-measurements.yaml
+	@echo ""
+	@echo "=========================================="
+	@echo "Attestation Policy Applied!"
+	@echo "=========================================="
+	@echo ""
+	@echo "✓ AttestationReference 'default-ima-policy' created"
+	@echo "✓ All enrollments with attestation data will be verified against this policy"
+	@echo ""
+	@echo "Next step: Boot agent VM with 'make attestation-agent-vm'"
+	@echo ""
+	@echo "To use the full measurements.txt baseline instead:"
+	@echo "  cd examples/attestation && ./create-attestation-ref-from-measurements.sh"
+	@echo "  bin/flightctl apply -f examples/attestation/attestation-reference-from-measurements.yaml"
+
+# Build agent-vm with the specific container image that matches measurements.txt
+attestation-agent-vm:
+	@echo "Building agent VM with attestation config and default bootc image..."
+	@echo "Ensuring attestation-enabled config is generated and injected..."
+	rm -f bin/.e2e-agent-injected
+	$(MAKE) prepare-agent-config-attestation
+	touch bin/.e2e-agent-certs
+	@if [ ! -f bin/output/qcow2/disk.qcow2 ]; then \
+		echo "Disk image not found, building e2e-agent-images..."; \
+		$(MAKE) -j1 e2e-agent-images; \
+	fi
+	$(MAKE) -j1 agent-vm
+	@echo ""
+	@echo "=========================================="
+	@echo "Agent VM Running!"
+	@echo "=========================================="
+	@echo ""
+	@echo "✓ TPM-enabled agent VM running with vTPM 2.0 emulator"
+	@echo "✓ Agent will automatically enroll with attestation data"
+	@echo ""
+	@echo "Monitor the agent enrollment and attestation verification in the server logs"
+
+# Configure TPM CA certificates for attestation verification
+configure-attestation-tpm-cas:
+	@echo "Configuring TPM CA certificates for attestation verification..."
+	test/scripts/add-certs-to-deployment.sh bin/tpm-cas
+
+# Complete attestation demo: deploys server, applies policy, boots agent VM
+attestation-demo: attestation-server wait-for-server attestation-policy attestation-agent-vm
+	@echo ""
+	@echo "=========================================="
+	@echo "Attestation Demo Environment Ready!"
+	@echo "=========================================="
+	@echo ""
+	@echo "✓ FlightCTL API server configured for attestation"
+	@echo "✓ Custom Keylime verifier (master branch) deployed and running"
+	@echo "✓ TPM CA certificates configured"
+	@echo "✓ Attestation policy 'default-ima-policy' applied"
+	@echo "✓ TPM-enabled agent VM running with vTPM 2.0 emulator"
+	@echo ""
+	@echo "The agent VM is now enrolling with attestation data."
+	@echo "Monitor server logs to see attestation verification in action."
+	@echo ""
+	@echo "See examples/attestation/README.md for more details"
+	@echo ""
+
+# Backward compatibility aliases
+attestation-demo-deploy-helm: attestation-server
+attestation-demo-agent-vm: attestation-agent-vm
+attestation-demo-apply-policy: attestation-policy
+
+clean-attestation-demo: clean-agent-vm clean-cluster
+
+# Apply attestation policy from measurements.txt
+attestation-demo-apply-policy:
+	@echo "Applying AttestationReference from measurements.txt..."
+	bin/flightctl apply -f examples/attestation/attestation-reference-from-measurements.yaml
+	@echo ""
+	@echo "AttestationReference 'default-ima-policy' created!"
+	@echo "All enrollments with attestation data will be verified against this policy."
+	@echo ""
+	@echo "Using measurements from measurements.txt (automatically generated from disk image)"
+
+PHONY: deploy-db deploy cluster services-container run-services-container clean-services-container attestation-server wait-for-server attestation-policy attestation-agent-vm attestation-demo prepare-agent-config-attestation configure-attestation-tpm-cas clean-attestation-demo attestation-demo-deploy-helm attestation-demo-apply-policy

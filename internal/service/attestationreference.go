@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	attestationpolicy "github.com/flightctl/flightctl/internal/attestation/policy"
 	"github.com/flightctl/flightctl/internal/domain"
 	"github.com/flightctl/flightctl/internal/store/selector"
 	"github.com/google/uuid"
@@ -12,6 +13,11 @@ import (
 func (h *ServiceHandler) CreateAttestationReference(ctx context.Context, orgId uuid.UUID, attestationRef domain.AttestationReference) (*domain.AttestationReference, domain.Status) {
 	// don't set fields that are managed by the service
 	NilOutManagedObjectMetaProperties(&attestationRef.Metadata)
+
+	// Auto-convert runtime policy from allowlist to JSON if needed
+	if err := processRuntimePolicy(&attestationRef); err != nil {
+		return nil, domain.StatusBadRequest(err.Error())
+	}
 
 	if errs := attestationRef.Validate(); len(errs) > 0 {
 		return nil, domain.StatusBadRequest(errors.Join(errs...).Error())
@@ -53,6 +59,11 @@ func (h *ServiceHandler) ReplaceAttestationReference(ctx context.Context, orgId 
 		NilOutManagedObjectMetaProperties(&attestationRef.Metadata)
 	}
 
+	// Auto-convert runtime policy from allowlist to JSON if needed
+	if err := processRuntimePolicy(&attestationRef); err != nil {
+		return nil, domain.StatusBadRequest(err.Error())
+	}
+
 	if errs := attestationRef.Validate(); len(errs) > 0 {
 		return nil, domain.StatusBadRequest(errors.Join(errs...).Error())
 	}
@@ -89,6 +100,11 @@ func (h *ServiceHandler) PatchAttestationReference(ctx context.Context, orgId uu
 		return nil, domain.StatusBadRequest(err.Error())
 	}
 
+	// Auto-convert runtime policy from allowlist to JSON if needed
+	if err := processRuntimePolicy(newObj); err != nil {
+		return nil, domain.StatusBadRequest(err.Error())
+	}
+
 	if errs := newObj.Validate(); len(errs) > 0 {
 		return nil, domain.StatusBadRequest(errors.Join(errs...).Error())
 	}
@@ -112,4 +128,23 @@ func (h *ServiceHandler) callbackAttestationReferenceUpdated(ctx context.Context
 // callbackAttestationReferenceDeleted is the attestation-reference-specific callback that handles deletion events
 func (h *ServiceHandler) callbackAttestationReferenceDeleted(ctx context.Context, resourceKind domain.ResourceKind, orgId uuid.UUID, name string, oldResource, newResource interface{}, created bool, err error) {
 	h.eventHandler.HandleGenericResourceDeletedEvents(ctx, resourceKind, orgId, name, oldResource, newResource, created, err)
+}
+
+// processRuntimePolicy auto-converts runtime policy from allowlist format to JSON if needed
+func processRuntimePolicy(attestationRef *domain.AttestationReference) error {
+	if attestationRef.Spec.RuntimePolicy == nil || *attestationRef.Spec.RuntimePolicy == "" {
+		return nil // No runtime policy to process
+	}
+
+	runtimePolicy := *attestationRef.Spec.RuntimePolicy
+
+	// Auto-detect and convert if needed
+	convertedJSON, err := attestationpolicy.ConvertToJSON(runtimePolicy)
+	if err != nil {
+		return errors.New("invalid runtime policy: " + err.Error())
+	}
+
+	// Update the runtime policy with the normalized JSON format
+	attestationRef.Spec.RuntimePolicy = &convertedJSON
+	return nil
 }

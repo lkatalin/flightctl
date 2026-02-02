@@ -1243,6 +1243,8 @@ func (s *tpmSession) RemoveApplicationKey(appName string) error {
 }
 
 // Quote generates a TPM quote with PCR values using the LAK
+// To avoid PCR timing races, this function reads PCRs immediately before generating
+// the quote to minimize the window where PCR values could change
 func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (quote []byte, signature []byte, pcrs []byte, err error) {
 	// Load LAK if not already loaded
 	lakHandle, err := s.LoadKey(LAK)
@@ -1255,7 +1257,7 @@ func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (q
 		Buffer: nonce,
 	}
 
-	// Execute TPM2_Quote command
+	// Execute TPM2_Quote command first
 	quoteCmd := tpm2.Quote{
 		SignHandle: tpm2.AuthHandle{
 			Handle: lakHandle.Handle,
@@ -1280,24 +1282,178 @@ func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (q
 		return nil, nil, nil, fmt.Errorf("executing TPM2_Quote: %w", err)
 	}
 
-	// Marshal the quote and signature
-	quoteMarshal := tpm2.Marshal(quoteRsp.Quoted)
-	signatureMarshal := tpm2.Marshal(quoteRsp.Signature)
-
-	// Read PCR values
-	pcrReadCmd := tpm2.PCRRead{
+	// Read PCR values IMMEDIATELY AFTER the quote to get the values that match the quote
+	// This minimizes the window where PCRs could change between quote and read
+	// For IMA PCRs which are constantly extending, this is critical
+	pcrReadCmdAfter := tpm2.PCRRead{
 		PCRSelectionIn: *pcrSelection,
 	}
 
-	pcrReadRsp, err := pcrReadCmd.Execute(transport.FromReadWriter(s.conn))
+	pcrReadRspAfter, err := pcrReadCmdAfter.Execute(transport.FromReadWriter(s.conn))
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("reading PCRs: %w", err)
+		return nil, nil, nil, fmt.Errorf("reading PCRs after quote: %w", err)
 	}
 
-	// Marshal PCR values
-	pcrMarshal := tpm2.Marshal(pcrReadRsp.PCRValues)
+	// Marshal the quote and signature
+	quoteMarshalFull := tpm2.Marshal(quoteRsp.Quoted)
+	signatureMarshalFull := tpm2.Marshal(quoteRsp.Signature)
+
+	// Keylime expects raw TPM structures without TPM2B length prefixes:
+	// - Quote should be TPMS_ATTEST (without TPM2B_ATTEST wrapper)
+	// - Signature should be TPMT_SIGNATURE (full structure including sigAlg field)
+	//
+	// quoteRsp.Quoted is TPM2BAttest which marshals with a 2-byte length prefix
+	// Strip the TPM2B prefix from quote
+	if len(quoteMarshalFull) < 2 {
+		return nil, nil, nil, fmt.Errorf("marshaled quote too short: %d bytes", len(quoteMarshalFull))
+	}
+	quoteMarshal := quoteMarshalFull[2:]
+
+	// quoteRsp.Signature is TPMTSignature - this is the full TPMT_SIGNATURE structure
+	// TPMT_SIGNATURE starts with sigAlg (2 bytes, e.g. 0x0018 for ECDSA), then hash alg, then signature data
+	// Keylime expects the complete TPMT_SIGNATURE, so DON'T strip anything
+	signatureMarshal := signatureMarshalFull
+
+	// Convert PCR values read after the quote to Intel tpm2-tools format
+	// We use the PCR values read AFTER the quote to match the PCR state at quote-time
+	// IMPORTANT: Use PCRSelectionOut (what TPM actually returned) not PCRSelectionIn (what we requested)
+	// TPM may not return all requested PCRs in one response
+	pcrMarshal, err := convertPCRsToIntelFormat(&pcrReadRspAfter.PCRSelectionOut, &pcrReadRspAfter.PCRValues)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("converting PCRs to Intel format: %w", err)
+	}
 
 	return quoteMarshal, signatureMarshal, pcrMarshal, nil
+}
+
+// convertPCRsToIntelFormat converts TPM2 PCR values to Intel tpm2-tools format
+// Keylime expects PCR data in little-endian C struct layout (as produced by Intel tpm2-tools),
+// not the standard TPM2 marshaled (big-endian) format
+func convertPCRsToIntelFormat(pcrSelection *tpm2.TPMLPCRSelection, pcrValues *tpm2.TPMLDigest) ([]byte, error) {
+	buf := make([]byte, 0, 4096)
+
+	// TPML_PCR_SELECTION:count (4 bytes, little-endian uint32)
+	// This is the number of PCR selections (hash algorithms)
+	count := uint32(len(pcrSelection.PCRSelections)) //nolint:gosec // PCR count is bounded by TPM spec
+	buf = append(buf, byte(count), byte(count>>8), byte(count>>16), byte(count>>24))
+
+	// Build TPMS_PCR_SELECTION array (16 entries, even if some are empty)
+	// Each entry: hash_alg (2 bytes LE), size_of_select (1 byte), pcr_select (3 bytes), padding (2 bytes)
+	for i := 0; i < 16; i++ {
+		if i < len(pcrSelection.PCRSelections) {
+			sel := pcrSelection.PCRSelections[i]
+			hashAlg := uint16(sel.Hash)
+			sizeOfSelect := byte(len(sel.PCRSelect))
+
+			// hash_alg (2 bytes, little-endian)
+			buf = append(buf, byte(hashAlg), byte(hashAlg>>8))
+
+			// size_of_select (1 byte) - should be 3 for valid selections or 0 for empty
+			buf = append(buf, sizeOfSelect)
+
+			// pcr_select (3 bytes bitmask)
+			if len(sel.PCRSelect) >= 3 {
+				buf = append(buf, sel.PCRSelect[0], sel.PCRSelect[1], sel.PCRSelect[2])
+			} else {
+				// Pad with zeros if less than 3 bytes
+				for j := 0; j < 3; j++ {
+					if j < len(sel.PCRSelect) {
+						buf = append(buf, sel.PCRSelect[j])
+					} else {
+						buf = append(buf, 0)
+					}
+				}
+			}
+
+			// Padding (2 bytes alignment)
+			buf = append(buf, 0, 0)
+		} else {
+			// Empty entry: hash_alg=0, size_of_select=0, pcr_select=0,0,0, padding=0,0
+			buf = append(buf, 0, 0, 0, 0, 0, 0, 0, 0)
+		}
+	}
+
+	// Calculate total number of TPML_DIGEST structures needed
+	// Each TPML_DIGEST can hold max 8 digests per TPM 2.0 spec
+	// We need to split PCRs into groups of 8 for each hash algorithm
+	totalDigestStructs := 0
+	for _, sel := range pcrSelection.PCRSelections {
+		// Count selected PCRs in this bank
+		selectedCount := 0
+		for pcrNum := 0; pcrNum < 24; pcrNum++ {
+			byteIdx := pcrNum / 8
+			bitIdx := pcrNum % 8
+			if byteIdx < len(sel.PCRSelect) && (sel.PCRSelect[byteIdx]&(1<<bitIdx)) != 0 {
+				selectedCount++
+			}
+		}
+		// Calculate how many TPML_DIGEST structures needed for this bank
+		// Each TPML_DIGEST holds max 8 digests
+		digestStructsForBank := (selectedCount + 7) / 8 // Ceiling division
+		totalDigestStructs += digestStructsForBank
+	}
+
+	// Write the number of TPML_DIGEST structures
+	pcrsCount := uint32(totalDigestStructs) //nolint:gosec // PCR count is bounded by TPM spec
+	buf = append(buf, byte(pcrsCount), byte(pcrsCount>>8), byte(pcrsCount>>16), byte(pcrsCount>>24))
+
+	// For each PCR bank, write PCR values split into TPML_DIGEST structures
+	// Each TPML_DIGEST: count (4 bytes LE), then up to 8 TPM2B_DIGEST entries
+	// Each TPM2B_DIGEST: size (2 bytes LE) + value + padding to 64 bytes
+	digestIdx := 0
+	for _, sel := range pcrSelection.PCRSelections {
+		// Get list of selected PCRs in this bank
+		selectedPCRs := make([]int, 0, 24)
+		for pcrNum := 0; pcrNum < 24; pcrNum++ {
+			byteIdx := pcrNum / 8
+			bitIdx := pcrNum % 8
+			if byteIdx < len(sel.PCRSelect) && (sel.PCRSelect[byteIdx]&(1<<bitIdx)) != 0 {
+				selectedPCRs = append(selectedPCRs, pcrNum)
+			}
+		}
+
+		// Split selected PCRs into groups of 8 (TPML_DIGEST max per TPM spec)
+		for groupStart := 0; groupStart < len(selectedPCRs); groupStart += 8 {
+			groupEnd := groupStart + 8
+			if groupEnd > len(selectedPCRs) {
+				groupEnd = len(selectedPCRs)
+			}
+			groupSize := groupEnd - groupStart
+
+			// Write TPML_DIGEST count (number of digests in this group)
+			pcrCount := uint32(groupSize) //nolint:gosec // PCR count is bounded by TPM spec
+			buf = append(buf, byte(pcrCount), byte(pcrCount>>8), byte(pcrCount>>16), byte(pcrCount>>24))
+
+			// Write TPM2B_DIGEST entries for this group (max 8)
+			for i := 0; i < groupSize; i++ {
+				if digestIdx < len(pcrValues.Digests) {
+					digest := pcrValues.Digests[digestIdx]
+					digestIdx++
+
+					// Size (2 bytes, little-endian)
+					size := uint16(len(digest.Buffer)) //nolint:gosec // Digest size is bounded by TPM spec
+					buf = append(buf, byte(size), byte(size>>8))
+
+					// Digest value
+					buf = append(buf, digest.Buffer...)
+
+					// Padding to 64 bytes total (size of SHA512)
+					padding := 64 - len(digest.Buffer)
+					for j := 0; j < padding; j++ {
+						buf = append(buf, 0)
+					}
+				} else {
+					// Empty digest: size=0, then 64 bytes of zeros
+					buf = append(buf, 0, 0)
+					for j := 0; j < 64; j++ {
+						buf = append(buf, 0)
+					}
+				}
+			}
+		}
+	}
+
+	return buf, nil
 }
 
 // GetEndorsementKeyPublic returns the endorsement key public blob

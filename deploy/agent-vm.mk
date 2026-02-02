@@ -10,26 +10,41 @@ INJECT_CONFIG ?= true
 
 BUILD_TYPE := bootc
 
+VM_LOCK_FILE := /tmp/flightctl-vm-$(VMNAME).lock
+
 ifeq ($(INJECT_CONFIG),true)
 agent-vm: bin/output/qcow2/disk.qcow2 prepare-e2e-qcow-config
 else
 agent-vm: bin/output/qcow2/disk.qcow2
 endif
 	@echo "Booting Agent VM from $(VMDISK) with disk size $(VMDISKSIZE)"
-	sudo cp bin/output/qcow2/disk.qcow2 $(VMDISK)
+	@if [ -f "$(VM_LOCK_FILE)" ]; then \
+		echo "ERROR: VM creation already in progress (lock file exists: $(VM_LOCK_FILE))"; \
+		echo "If this is a stale lock, remove it with: rm $(VM_LOCK_FILE)"; \
+		exit 1; \
+	fi
+	@touch "$(VM_LOCK_FILE)"
+	@trap "rm -f $(VM_LOCK_FILE)" EXIT; \
+	echo "Cleaning up any existing VM with name $(VMNAME)..."; \
+	sudo virsh destroy $(VMNAME) 2>&1 || echo "Note: destroy failed (VM may not exist or already stopped)"; \
+	sudo virsh undefine $(VMNAME) --nvram 2>&1 || echo "Note: undefine failed (VM may not exist)"
+	@sudo cp bin/output/qcow2/disk.qcow2 $(VMDISK)
 	@if [ "$(VMDISKSIZE)" != "$(VMDISKSIZE_DEFAULT)" ]; then \
 		sudo qemu-img resize $(VMDISK) $(VMDISKSIZE); \
 	fi
-	sudo chown libvirt:libvirt $(VMDISK) 2>/dev/null || true
-	sudo virt-install --name $(VMNAME) \
+	@sudo chown libvirt:libvirt $(VMDISK) 2>/dev/null || true
+	@echo "Starting VM $(VMNAME)..."
+	@sudo virt-install --name $(VMNAME) \
 		--tpm backend.type=emulator,backend.version=2.0,model=tpm-tis \
 					  --vcpus $(VMCPUS) \
 					  --memory $(VMRAM) \
 					  --import --disk $(VMDISK),format=qcow2 \
 					  --os-variant fedora-eln  \
-					  --autoconsole text \
+					  --noautoconsole \
 					  --wait $(VMWAIT) \
-					  --transient || true
+					  --transient
+	@echo "VM $(VMNAME) started successfully"
+	@rm -f "$(VM_LOCK_FILE)"
 
 
 update-vm-agent: bin/flightctl-agent
@@ -56,7 +71,12 @@ clean-agent-vm:
 	sudo virsh destroy $(VMNAME) || true
 	sudo rm -f $(VMDISK)
 
-.PHONY: clean-agent-vm
+# Clean all agent image artifacts including cached bundles
+# This forces a complete rebuild of agent images
+clean-agent-images:
+	@test/scripts/clean-agent-images.sh
+
+.PHONY: clean-agent-vm clean-agent-images
 
 agent-container: BUILD_TYPE := regular
 agent-container: bin/output/qcow2/disk.qcow2

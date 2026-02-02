@@ -145,7 +145,7 @@ export OS_ID
 
 build_base() {
     echo "Building base image with PODMAN_BUILD_EXTRA_FLAGS: ${PODMAN_BUILD_EXTRA_FLAGS}"
-    sudo AGENT_OS_ID="${AGENT_OS_ID}" "${SCRIPT_DIR}/scripts/build.sh" --base
+    sudo AGENT_OS_ID="${AGENT_OS_ID}" DEVICE_BASE_IMAGE="${DEVICE_BASE_IMAGE}" "${SCRIPT_DIR}/scripts/build.sh" --base
 }
 
 build_variants_and_qcow2() {

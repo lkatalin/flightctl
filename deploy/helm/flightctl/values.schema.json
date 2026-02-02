@@ -503,6 +503,47 @@
         }
       }
     },
+    "keylime": {
+      "type": "object",
+      "description": "Keylime verifier configuration for TPM attestation",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Enable Keylime verifier for real attestation verification (when false, mock mode is used)" },
+        "verifierUrl": { "type": "string", "description": "URL of the Keylime verifier service" },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": { "type": "string", "description": "Keylime verifier container image repository" },
+            "tag": { "type": "string", "description": "Keylime verifier image tag" },
+            "pullPolicy": { "type": "string", "description": "Image pull policy for Keylime verifier container" }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource requests and limits for Keylime verifier",
+          "additionalProperties": false,
+          "properties": {
+            "limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cpu": { "type": "string", "description": "CPU limit for Keylime verifier" },
+                "memory": { "type": "string", "description": "Memory limit for Keylime verifier" }
+              }
+            },
+            "requests": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cpu": { "type": "string", "description": "CPU request for Keylime verifier" },
+                "memory": { "type": "string", "description": "Memory request for Keylime verifier" }
+              }
+            }
+          }
+        }
+      }
+    },
     "imageBuilderApi": {
       "type": "object",
       "description": "ImageBuilder API configuration",

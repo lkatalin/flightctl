@@ -99,3 +99,8 @@ data:
         endpoint: {{ .Values.dev.tracing.endpoint }}
         insecure: {{ .Values.dev.tracing.insecure }}
     {{ end }}
+    {{- if .Values.keylime.enabled }}
+    keylime:
+        enabled: true
+        verifierUrl: {{ .Values.keylime.verifierUrl | default (printf "https://keylime-verifier.%s.svc.cluster.local:8881" .Release.Namespace) }}
+    {{- end }}

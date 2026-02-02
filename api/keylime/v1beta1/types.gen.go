@@ -5,8 +5,23 @@ package v1beta1
 
 // AttestationVerificationRequest Request to verify TPM attestation data with the Keylime verifier
 type AttestationVerificationRequest struct {
+	// AcceptTpmEncryptionAlgs List of accepted TPM encryption algorithms (required by Keylime)
+	AcceptTpmEncryptionAlgs []string `json:"accept_tpm_encryption_algs"`
+
+	// AcceptTpmHashAlgs List of accepted TPM hash algorithms (required by Keylime)
+	AcceptTpmHashAlgs []string `json:"accept_tpm_hash_algs"`
+
+	// AcceptTpmSigningAlgs List of accepted TPM signing algorithms (required by Keylime)
+	AcceptTpmSigningAlgs []string `json:"accept_tpm_signing_algs"`
+
 	// AikTpm Base64-encoded AIK public key from TPM
 	AikTpm string `json:"aik_tpm"`
+
+	// CloudagentIp IP address or hostname of the agent (required by Keylime)
+	CloudagentIp string `json:"cloudagent_ip"`
+
+	// CloudagentPort Port number of the agent (required by Keylime)
+	CloudagentPort int `json:"cloudagent_port"`
 
 	// EkTpm Base64-encoded EK public key from TPM
 	EkTpm *string `json:"ek_tpm,omitempty"`
@@ -20,8 +35,14 @@ type AttestationVerificationRequest struct {
 	// HashAlg Hash algorithm used (e.g., "sha256", "sha384")
 	HashAlg *string `json:"hash_alg,omitempty"`
 
+	// ImaSignVerificationKeys IMA signature verification keys (required by Keylime)
+	ImaSignVerificationKeys string `json:"ima_sign_verification_keys"`
+
 	// MbPolicy JSON-formatted measured boot policy
 	MbPolicy *string `json:"mb_policy,omitempty"`
+
+	// Metadata Metadata about the agent as JSON string (required by Keylime)
+	Metadata string `json:"metadata"`
 
 	// MtlsCert mTLS certificate for secure communication (optional)
 	MtlsCert *string `json:"mtls_cert,omitempty"`
@@ -29,11 +50,17 @@ type AttestationVerificationRequest struct {
 	// Quote Base64-encoded TPM quote data
 	Quote *string `json:"quote,omitempty"`
 
+	// RevocationKey Revocation key for the agent (required by Keylime)
+	RevocationKey string `json:"revocation_key"`
+
 	// RuntimePolicy JSON-formatted IMA runtime policy
 	RuntimePolicy *string `json:"runtime_policy,omitempty"`
 
 	// SignAlg Signature algorithm used (e.g., "rsassa", "rsapss")
 	SignAlg *string `json:"sign_alg,omitempty"`
+
+	// SupportedVersion Supported Keylime protocol version
+	SupportedVersion *string `json:"supported_version,omitempty"`
 
 	// TpmPolicy JSON-formatted TPM PCR policy
 	TpmPolicy *string `json:"tpm_policy,omitempty"`
@@ -41,8 +68,8 @@ type AttestationVerificationRequest struct {
 
 // AttestationVerificationResponse Response from Keylime attestation verification
 type AttestationVerificationResponse struct {
-	// Results Verification result status (e.g., "Success", "Failed")
-	Results string `json:"results"`
+	// Results Verification result details object
+	Results map[string]interface{} `json:"results"`
 }
 
 // ErrorResponse Error response from Keylime verifier
@@ -57,5 +84,68 @@ type ErrorResponse struct {
 	Status *string `json:"status,omitempty"`
 }
 
+// VerifyEvidenceRequest Request to verify TPM evidence using v2.5 one-shot verification API (latest master branch format with nested data)
+type VerifyEvidenceRequest struct {
+	// Data Nested object containing all attestation data parameters
+	Data struct {
+		// HashAlg Hash algorithm used
+		HashAlg string `json:"hash_alg"`
+
+		// ImaMeasurementList IMA measurement log
+		ImaMeasurementList *string `json:"ima_measurement_list,omitempty"`
+
+		// MbLog Measured boot log
+		MbLog *string `json:"mb_log,omitempty"`
+
+		// MbPolicy Measured boot policy (JSON string)
+		MbPolicy *string `json:"mb_policy,omitempty"`
+
+		// Nonce Base64-encoded challenge nonce
+		Nonce string `json:"nonce"`
+
+		// Quote Base64-encoded TPM quote data
+		Quote string `json:"quote"`
+
+		// RuntimePolicy IMA runtime policy (JSON object as string)
+		RuntimePolicy *string `json:"runtime_policy,omitempty"`
+
+		// TpmAk Base64-encoded Attestation Key
+		TpmAk string `json:"tpm_ak"`
+
+		// TpmEk Base64-encoded Endorsement Key
+		TpmEk *string `json:"tpm_ek,omitempty"`
+
+		// TpmPolicy TPM policy (JSON object as string)
+		TpmPolicy *string `json:"tpm_policy,omitempty"`
+	} `json:"data"`
+
+	// Type Evidence type (always "tpm" for TPM attestation)
+	Type string `json:"type"`
+}
+
+// VerifyEvidenceResponse Response from v2.5 one-shot evidence verification (latest master branch format)
+type VerifyEvidenceResponse struct {
+	// Code HTTP status code
+	Code int `json:"code"`
+
+	// Results Verification results
+	Results struct {
+		// Claims Claims extracted from the evidence
+		Claims *map[string]interface{} `json:"claims,omitempty"`
+
+		// Failures List of validation failures (if any)
+		Failures *[]map[string]interface{} `json:"failures,omitempty"`
+
+		// Valid Whether the evidence passed verification (true=valid, false=invalid)
+		Valid *bool `json:"valid,omitempty"`
+	} `json:"results"`
+
+	// Status Status message
+	Status string `json:"status"`
+}
+
 // VerifyAttestationJSONRequestBody defines body for VerifyAttestation for application/json ContentType.
 type VerifyAttestationJSONRequestBody = AttestationVerificationRequest
+
+// VerifyEvidenceJSONRequestBody defines body for VerifyEvidence for application/json ContentType.
+type VerifyEvidenceJSONRequestBody = VerifyEvidenceRequest

@@ -17,14 +17,16 @@ ensure_organization_set
 
 status_update_interval=0m2s
 spec_fetch_interval=0m2s
+tpm_attestation_enabled=false
 # Use external getopt for long options
-options=$(getopt -o h --long status-update-interval:,spec-fetch-interval:,help -n "$0" -- "$@")
+options=$(getopt -o h --long status-update-interval:,spec-fetch-interval:,tpm-attestation-enabled,help -n "$0" -- "$@")
 eval set -- "$options"
 while true; do
   case "$1" in
-  -h|--help) echo "Usage: $0 --status-update-interval=0m2s"; exit 1 ;;
+  -h|--help) echo "Usage: $0 --status-update-interval=0m2s --tpm-attestation-enabled"; exit 1 ;;
   --status-update-interval) status_update_interval=$2; shift 2 ;;
   --spec-fetch-interval) spec_fetch_interval=$2; shift 2 ;;
+  --tpm-attestation-enabled) tpm_attestation_enabled=true; shift ;;
   --) shift; break ;;
   *) echo "Invalid option: $1" >&2; exit 1 ;;
   esac
@@ -32,10 +34,23 @@ done
 
 # - Enforce the agent to fetch the spec and update status every 2 seconds to improve the E2E test speed
 # - Include the custom system info collectors that were defined in the container image
-cat <<EOF | tee -a  bin/agent/etc/flightctl/config.yaml
+if [ "$tpm_attestation_enabled" = "true" ]; then
+  cat <<EOF | tee -a  bin/agent/etc/flightctl/config.yaml
+spec-fetch-interval: $spec_fetch_interval
+status-update-interval: $status_update_interval
+system-info-custom:
+  - siteName
+  - emptyValue
+tpm:
+  enabled: true
+  attestation-enabled: true
+EOF
+else
+  cat <<EOF | tee -a  bin/agent/etc/flightctl/config.yaml
 spec-fetch-interval: $spec_fetch_interval
 status-update-interval: $status_update_interval
 system-info-custom:
   - siteName
   - emptyValue
 EOF
+fi

@@ -7,9 +7,10 @@ USER 0
 # Copy dependencies first (most stable)
 COPY go.mod go.sum ./
 
-# Download dependencies (cached layer)
-RUN --mount=type=cache,target=/opt/app-root/src/go/pkg/mod \
-    go mod download
+# Download dependencies into the image (not cache mount)
+# This ensures all modules including platform-specific source files are available
+# We don't use cache mount here because it can cause issues with cross-compilation
+RUN go mod download
 
 # Copy build tools and configs
 COPY Makefile .
@@ -40,9 +41,9 @@ ENV SOURCE_GIT_TAG=${SOURCE_GIT_TAG}
 ENV SOURCE_GIT_TREE_STATE=${SOURCE_GIT_TREE_STATE}
 ENV SOURCE_GIT_COMMIT=${SOURCE_GIT_COMMIT}
 
-# Use BuildKit cache mounts for Go caching
+# Use BuildKit cache mount only for build cache, not module cache
+# Module cache is in the image layer from the previous RUN command
 RUN --mount=type=cache,target=/opt/app-root/src/.cache/go-build \
-    --mount=type=cache,target=/opt/app-root/src/go/pkg/mod \
     make build-multiarch-clis
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7-1763362218

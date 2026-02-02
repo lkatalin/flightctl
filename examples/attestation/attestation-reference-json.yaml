@@ -1,0 +1,32 @@
+apiVersion: v1beta1
+kind: AttestationReference
+metadata:
+  name: default-ima-policy
+spec:
+  # This AttestationReference will be used as the default policy for all enrollments
+  matchAll: true
+
+  # Runtime policy in Keylime JSON format
+  # This is the same policy as attestation-reference-allowlist.yaml but in JSON format
+  runtimePolicy: |
+    {
+      "meta": {
+        "version": 1,
+        "generator": 4
+      },
+      "release": 0,
+      "digests": {
+        "/usr/bin/bash": ["abc123def456abc123def456abc123def456abc123def456abc123def456abc1"],
+        "/usr/bin/ls": ["def456abc123def456abc123def456abc123def456abc123def456abc123def4"],
+        "/usr/sbin/init": ["123456abc789def012abc456def789abc012def456abc789def012abc456def7"]
+      },
+      "excludes": [],
+      "keyrings": {},
+      "ima": {
+        "ignored_keyrings": [],
+        "log_hash_alg": "sha256",
+        "dm_policy": null
+      },
+      "ima-buf": {},
+      "verification-keys": ""
+    }
