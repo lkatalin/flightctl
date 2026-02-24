@@ -352,6 +352,9 @@ func (h *ServiceHandler) processAttestationWithKeylime(ctx context.Context, orgI
 			formattedQuote := "r" + parts[0] + ":" + parts[1] + ":" + parts[2]
 			keylimeQuote = &formattedQuote
 			h.log.Infof("Sending quote to Keylime (no stripping needed): total %d chars", len(formattedQuote))
+
+			// Dump full quote for debugging
+			h.log.Infof("QUOTE_DEBUG: Full quote data: %s", formattedQuote)
 		}
 
 		// Parse PCRs from the quote to dynamically construct TPM policy mask
