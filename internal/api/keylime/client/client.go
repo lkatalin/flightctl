@@ -130,7 +130,11 @@ func (c *Client) VerifyAttestation(ctx context.Context, deviceID string, aikTpm 
 		req.Data.TpmPolicy = &defaultPolicy
 	}
 	if runtimePolicy != nil && *runtimePolicy != "" {
+		c.log.Infof("DEBUG: Setting req.Data.RuntimePolicy, size: %d bytes", len(*runtimePolicy))
+		c.log.Infof("DEBUG: RuntimePolicy first 100 chars: %.100s", *runtimePolicy)
 		req.Data.RuntimePolicy = runtimePolicy
+	} else {
+		c.log.Warnf("DEBUG: RuntimePolicy is nil or empty, NOT setting req.Data.RuntimePolicy")
 	}
 	// Only send mbPolicy and mbLog if we have a non-empty measured boot policy
 	// Check if mbPolicy is effectively empty (nil, empty string, or empty JSON object)
@@ -163,7 +167,24 @@ func (c *Client) VerifyAttestation(ctx context.Context, deviceID string, aikTpm 
 	// Debug: Log the request being sent to Keylime
 	c.log.Infof("Sending request to Keylime v2.5 API at %s", url)
 	c.log.Infof("Request body size: %d bytes", len(body))
-	c.log.Infof("Request JSON: %s", string(body))
+
+	// Debug: Check what fields are in the marshaled JSON
+	var checkReq map[string]interface{}
+	if err := json.Unmarshal(body, &checkReq); err == nil {
+		if data, ok := checkReq["data"].(map[string]interface{}); ok {
+			c.log.Infof("DEBUG: Marshaled request contains 'data' object with %d fields", len(data))
+			if rp, exists := data["runtime_policy"]; exists {
+				rpStr := fmt.Sprintf("%v", rp)
+				c.log.Infof("DEBUG: runtime_policy field EXISTS in marshaled JSON, size: %d bytes", len(rpStr))
+				c.log.Infof("DEBUG: runtime_policy first 200 chars: %.200s", rpStr)
+			} else {
+				c.log.Warnf("DEBUG: runtime_policy field NOT FOUND in marshaled JSON data object")
+			}
+			if tp, exists := data["tpm_policy"]; exists {
+				c.log.Infof("DEBUG: tpm_policy field exists: %v", tp)
+			}
+		}
+	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {

@@ -378,6 +378,19 @@ func (h *ServiceHandler) processAttestationWithKeylime(ctx context.Context, orgI
 		}
 	}
 
+	// DEBUG: Log what policies we're about to send to Keylime
+	h.log.Infof("DEBUG: About to call Keylime for device %s", deviceID)
+	h.log.Infof("DEBUG: RuntimePolicy is nil: %v", attestationRef.Spec.RuntimePolicy == nil)
+	if attestationRef.Spec.RuntimePolicy != nil {
+		h.log.Infof("DEBUG: RuntimePolicy size: %d bytes", len(*attestationRef.Spec.RuntimePolicy))
+		h.log.Infof("DEBUG: RuntimePolicy first 100 chars: %.100s", *attestationRef.Spec.RuntimePolicy)
+	}
+	h.log.Infof("DEBUG: TpmPolicy is nil: %v", attestationRef.Spec.TpmPolicy == nil)
+	if attestationRef.Spec.TpmPolicy != nil {
+		h.log.Infof("DEBUG: TpmPolicy: %s", *attestationRef.Spec.TpmPolicy)
+	}
+	h.log.Infof("DEBUG: MbPolicy is nil: %v", attestationRef.Spec.MbPolicy == nil)
+
 	// Call the Keylime verifier for one-shot verification (v2.5 API)
 	// Note: Keylime's _tpm2_checkquote() expects base64-encoded TPM2B_PUBLIC,
 	// which it internally converts to PEM before passing to the low-level checkquote() function.
