@@ -38,10 +38,11 @@ spec:
   runtimePolicy: |
 $(cat "$MEASUREMENTS_FILE" | sed 's/^/    /')
 
-  # TPM policy with mask 0x0 means no PCR verification
-  # Only IMA runtime measurements will be checked
+  # TPM policy includes PCRs 0-7 (boot measurements) and PCR 10 (IMA)
+  # PCR 10 must be included for Keylime to perform IMA runtime verification
+  # Mask 0x4ff = bits 0-7 (0xFF) + bit 10 (0x400) = PCRs 0-7 and 10
   tpmPolicy: |
-    {"mask": "0x0"}
+    {"mask": "0x4ff"}
 
   # Measured boot policy - empty JSON disables measured boot validation
   mbPolicy: |
