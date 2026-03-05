@@ -84,11 +84,68 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
+// logAttestationToFile logs the attestation request and response to a dedicated file
+func logAttestationToFile(deviceID string, requestData map[string]interface{}, responseData map[string]interface{}, requestTime, responseTime time.Time, err error) {
+	logFile := "/tmp/attestation_log.txt"
+	f, fileErr := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if fileErr != nil {
+		// Silently fail if we can't open log file
+		return
+	}
+	defer f.Close()
+
+	fmt.Fprintf(f, "\n================================================================================\n")
+	fmt.Fprintf(f, "ATTESTATION REQUEST/RESPONSE LOG\n")
+	fmt.Fprintf(f, "================================================================================\n")
+	fmt.Fprintf(f, "Enrollment Request ID: %s\n", deviceID)
+	fmt.Fprintf(f, "Request Sent:          %s\n", requestTime.Format(time.RFC3339Nano))
+	fmt.Fprintf(f, "Response Received:     %s\n", responseTime.Format(time.RFC3339Nano))
+	fmt.Fprintf(f, "Duration:              %v\n", responseTime.Sub(requestTime))
+	fmt.Fprintf(f, "\n")
+
+	fmt.Fprintf(f, "--- REQUEST SENT TO KEYLIME ---\n")
+	requestJSON, _ := json.MarshalIndent(requestData, "", "  ")
+
+	// Truncate very large fields for readability
+	var requestPretty map[string]interface{}
+	json.Unmarshal(requestJSON, &requestPretty)
+	if data, ok := requestPretty["data"].(map[string]interface{}); ok {
+		if rp, exists := data["runtime_policy"]; exists {
+			if rpStr, ok := rp.(string); ok && len(rpStr) > 500 {
+				data["runtime_policy"] = fmt.Sprintf("<TRUNCATED: %d bytes total, first 200 chars: %.200s...>", len(rpStr), rpStr)
+			}
+		}
+		if quote, exists := data["quote"]; exists {
+			if quoteStr, ok := quote.(string); ok && len(quoteStr) > 500 {
+				data["quote"] = fmt.Sprintf("<TRUNCATED: %d bytes total>", len(quoteStr))
+			}
+		}
+		if ima, exists := data["ima_measurement_list"]; exists {
+			if imaStr, ok := ima.(string); ok && len(imaStr) > 500 {
+				data["ima_measurement_list"] = fmt.Sprintf("<TRUNCATED: %d bytes total>", len(imaStr))
+			}
+		}
+	}
+	requestPrettyJSON, _ := json.MarshalIndent(requestPretty, "", "  ")
+	fmt.Fprintf(f, "%s\n", string(requestPrettyJSON))
+
+	fmt.Fprintf(f, "\n--- RESPONSE RECEIVED FROM KEYLIME ---\n")
+	if err != nil {
+		fmt.Fprintf(f, "ERROR: %v\n", err)
+	} else {
+		responseJSON, _ := json.MarshalIndent(responseData, "", "  ")
+		fmt.Fprintf(f, "%s\n", string(responseJSON))
+	}
+
+	fmt.Fprintf(f, "\n")
+}
+
 // VerifyAttestation sends TPM attestation data to the Keylime verifier for one-shot verification.
 // Uses the /v2.5/verify/evidence endpoint which does NOT require agent registration or polling.
 // This is a blocking call that returns immediate verification results.
 // Returns the verification result status string ("Success" or error details) and any error.
 func (c *Client) VerifyAttestation(ctx context.Context, deviceID string, aikTpm string, ekTpm *string, quote, nonce *string, mbPolicy, runtimePolicy, tpmPolicy *string, imaMeasurementList, mbLog *string) (string, error) {
+	requestTime := time.Now()
 	url := fmt.Sprintf("%s/v2.5/verify/evidence", c.baseURL)
 
 	// v2.5 API requires quote and nonce for one-shot verification
@@ -168,21 +225,21 @@ func (c *Client) VerifyAttestation(ctx context.Context, deviceID string, aikTpm 
 	c.log.Infof("Sending request to Keylime v2.5 API at %s", url)
 	c.log.Infof("Request body size: %d bytes", len(body))
 
-	// Debug: Check what fields are in the marshaled JSON
+	// Debug: Check what fields are in the marshaled JSON and store for logging
 	var checkReq map[string]interface{}
-	if err := json.Unmarshal(body, &checkReq); err == nil {
-		if data, ok := checkReq["data"].(map[string]interface{}); ok {
-			c.log.Infof("DEBUG: Marshaled request contains 'data' object with %d fields", len(data))
-			if rp, exists := data["runtime_policy"]; exists {
-				rpStr := fmt.Sprintf("%v", rp)
-				c.log.Infof("DEBUG: runtime_policy field EXISTS in marshaled JSON, size: %d bytes", len(rpStr))
-				c.log.Infof("DEBUG: runtime_policy first 200 chars: %.200s", rpStr)
-			} else {
-				c.log.Warnf("DEBUG: runtime_policy field NOT FOUND in marshaled JSON data object")
-			}
-			if tp, exists := data["tpm_policy"]; exists {
-				c.log.Infof("DEBUG: tpm_policy field exists: %v", tp)
-			}
+	json.Unmarshal(body, &checkReq)
+
+	if data, ok := checkReq["data"].(map[string]interface{}); ok {
+		c.log.Infof("DEBUG: Marshaled request contains 'data' object with %d fields", len(data))
+		if rp, exists := data["runtime_policy"]; exists {
+			rpStr := fmt.Sprintf("%v", rp)
+			c.log.Infof("DEBUG: runtime_policy field EXISTS in marshaled JSON, size: %d bytes", len(rpStr))
+			c.log.Infof("DEBUG: runtime_policy first 200 chars: %.200s", rpStr)
+		} else {
+			c.log.Warnf("DEBUG: runtime_policy field NOT FOUND in marshaled JSON data object")
+		}
+		if tp, exists := data["tpm_policy"]; exists {
+			c.log.Infof("DEBUG: tpm_policy field exists: %v", tp)
 		}
 	}
 
@@ -196,26 +253,39 @@ func (c *Client) VerifyAttestation(ctx context.Context, deviceID string, aikTpm 
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
+		logAttestationToFile(deviceID, checkReq, nil, requestTime, time.Now(), fmt.Errorf("failed to send request: %w", err))
 		return "", fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		logAttestationToFile(deviceID, checkReq, nil, requestTime, time.Now(), fmt.Errorf("failed to read response: %w", err))
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		var errorResp map[string]interface{}
+		json.Unmarshal(respBody, &errorResp)
+		logAttestationToFile(deviceID, checkReq, errorResp, requestTime, time.Now(), fmt.Errorf("keylime verifier returned status %d: %s", resp.StatusCode, string(respBody)))
 		return "", fmt.Errorf("keylime verifier returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	// Debug: Log raw response from Keylime
 	c.log.Infof("Raw Keylime response: %s", string(respBody))
 
+	responseTime := time.Now()
+
 	var response keylimeapi.VerifyEvidenceResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
+		// Log failed parse
+		logAttestationToFile(deviceID, checkReq, nil, requestTime, responseTime, fmt.Errorf("failed to unmarshal response: %w", err))
 		return "", fmt.Errorf("failed to unmarshal response: %w", err)
 	}
+
+	// Convert response to map for logging
+	var responseMap map[string]interface{}
+	json.Unmarshal(respBody, &responseMap)
 
 	// Valid is a bool pointer: true = valid, false = invalid
 	validBool := response.Results.Valid != nil && *response.Results.Valid
@@ -226,6 +296,18 @@ func (c *Client) VerifyAttestation(ctx context.Context, deviceID string, aikTpm 
 	} else {
 		c.log.Infof("Failures is nil")
 	}
+
+	// Log the complete attestation exchange to file
+	var logErr error
+	if !validBool {
+		if response.Results.Failures != nil && len(*response.Results.Failures) > 0 {
+			failuresJSON, _ := json.Marshal(*response.Results.Failures)
+			logErr = fmt.Errorf("attestation validation failed: %s", string(failuresJSON))
+		} else {
+			logErr = fmt.Errorf("attestation validation failed (no failure details provided)")
+		}
+	}
+	logAttestationToFile(deviceID, checkReq, responseMap, requestTime, responseTime, logErr)
 
 	// Check if validation succeeded
 	if validBool {
