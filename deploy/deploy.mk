@@ -273,18 +273,19 @@ clean-attestation-demo: clean-agent-vm clean-cluster
 	@echo "Removing agent bundle to force rebuild..."
 	rm -f bin/agent-artifacts/agent-images-bundle*.tar
 
-# Rebuild agent from source with complete cache clearing to pick up code changes
-# This ensures Podman container images are also cleared, not just files
+# Rebuild agent from source with cache clearing to pick up code changes
 attestation-demo-rebuild-agent: attestation-server wait-for-server
 	@echo "=========================================="
-	@echo "Rebuilding Agent with Complete Cache Clear"
+	@echo "Rebuilding Agent from Source"
 	@echo "=========================================="
 	@echo ""
 	@echo "Step 1: Clearing Go build cache..."
 	@go clean -cache
 	@echo ""
-	@echo "Step 2: Cleaning all agent artifacts, RPMs, disk images, and Podman images..."
-	$(MAKE) clean-e2e-agent-images
+	@echo "Step 2: Removing agent bundle and disk image to force rebuild..."
+	rm -f bin/agent-artifacts/agent-images-bundle*.tar
+	rm -f bin/output/qcow2/disk.qcow2
+	rm -f bin/.e2e-agent-images-*
 	@echo ""
 	@echo "Step 3: Rebuilding agent RPM and disk image from source..."
 	$(MAKE) e2e-agent-images
