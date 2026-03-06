@@ -79,8 +79,8 @@ RUN mkdir -p /etc/systemd/system && \
 [Unit]
 Description=Enable IMA kernel parameters for FlightCTL attestation
 ConditionKernelCommandLine=!ima_policy
+After=rpm-ostreed.service
 Before=flightctl-agent.service
-DefaultDependencies=no
 
 [Service]
 Type=oneshot
