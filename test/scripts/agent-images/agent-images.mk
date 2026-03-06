@@ -62,4 +62,7 @@ clean-e2e-agent-images:
 	@echo "Deleting e2e image archives..."
 	- rm -rf bin/agent-artifacts/ || true
 	- rm -f bin/app-images-bundle.tar || true
+	@echo "Pruning dangling podman images (build cache)..."
+	- podman image prune -a -f 2>/dev/null || true
+	- sudo podman image prune -a -f 2>/dev/null || true
 	@echo "E2E image cleanup completed."
