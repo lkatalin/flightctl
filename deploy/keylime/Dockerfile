@@ -7,12 +7,14 @@ FROM registry.fedoraproject.org/fedora:latest
 RUN dnf install -y \
     python3-pip \
     python3-devel \
+    python3-gpg \
     git \
     gcc \
     make \
     openssl \
     openssl-devel \
     procps-ng \
+    tpm2-tools \
     && dnf clean all
 
 # Clone latest Keylime from upstream master
@@ -20,7 +22,10 @@ RUN git clone https://github.com/keylime/keylime.git /keylime
 
 WORKDIR /keylime
 
-# Install Keylime and dependencies
+# Install Keylime's Python dependencies from requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Install Keylime itself in editable mode
 RUN pip3 install --no-cache-dir -e .
 
 # Create directory for TLS certificates
