@@ -270,6 +270,8 @@ attestation-demo-agent-vm: attestation-agent-vm
 attestation-demo-apply-policy: attestation-policy
 
 clean-attestation-demo: clean-agent-vm clean-cluster
+	@echo "Removing agent bundle to force rebuild..."
+	rm -f bin/agent-artifacts/agent-images-bundle*.tar
 
 # Rebuild agent from source with complete cache clearing to pick up code changes
 # This ensures Podman container images are also cleared, not just files
