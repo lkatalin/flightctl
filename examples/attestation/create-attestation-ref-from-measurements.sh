@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-MEASUREMENTS_FILE="${1:-../../measurements.txt}"
+MEASUREMENTS_FILE="${1:-measurements.txt}"
 OUTPUT_FILE="${2:-attestation-reference-from-measurements.yaml}"
 
 if [ ! -f "$MEASUREMENTS_FILE" ]; then

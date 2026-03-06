@@ -271,6 +271,48 @@ attestation-demo-apply-policy: attestation-policy
 
 clean-attestation-demo: clean-agent-vm clean-cluster
 
+# Rebuild agent from source with cache clearing to pick up code changes
+attestation-demo-rebuild-agent: attestation-server wait-for-server
+	@echo "Step 1: Clearing all build caches to force rebuild from source..."
+	@echo "  - Clearing Go build cache..."
+	@go clean -cache
+	@echo "  - Removing RPM files and build artifacts..."
+	@rm -rf bin/rpm/
+	@rm -rf bin/.rpm
+	@echo "  - Removing agent artifacts..."
+	@rm -rf bin/agent-artifacts/
+	@rm -f bin/.e2e-agent-images-*
+	@rm -f bin/.e2e-agent-injected
+	@rm -f bin/.e2e-agent-certs
+	@echo "  - Removing qcow2 disk..."
+	@rm -f bin/output/qcow2/disk.qcow2 || true
+	@echo ""
+	@echo "Step 2: Rebuilding agent RPM and disk image from source..."
+	$(MAKE) e2e-agent-images
+	@echo ""
+	@echo "Step 3: Generating new measurements.txt from rebuilt image..."
+	@echo "  (This happens automatically during e2e-agent-images)"
+	@echo ""
+	@echo "Step 4: Creating AttestationReference from new measurements..."
+	examples/attestation/create-attestation-ref-from-measurements.sh
+	@echo ""
+	@echo "Step 5: Applying updated AttestationReference..."
+	bin/flightctl apply -f examples/attestation/attestation-reference-from-measurements.yaml
+	@echo ""
+	@echo "Step 6: Starting agent VM..."
+	$(MAKE) attestation-agent-vm
+	@echo ""
+	@echo "==========================================="
+	@echo "Agent Rebuilt and Running!"
+	@echo "==========================================="
+	@echo ""
+	@echo "✓ Agent rebuilt from latest source code"
+	@echo "✓ New measurements.txt generated"
+	@echo "✓ AttestationReference updated with new measurements"
+	@echo "✓ Agent VM running with vTPM"
+	@echo ""
+	@echo "Monitor attestation in server logs"
+
 # Apply attestation policy from measurements.txt
 attestation-demo-apply-policy:
 	@echo "Applying AttestationReference from measurements.txt..."
@@ -281,4 +323,4 @@ attestation-demo-apply-policy:
 	@echo ""
 	@echo "Using measurements from measurements.txt (automatically generated from disk image)"
 
-PHONY: deploy-db deploy cluster services-container run-services-container clean-services-container attestation-server wait-for-server attestation-policy attestation-agent-vm attestation-demo prepare-agent-config-attestation configure-attestation-tpm-cas clean-attestation-demo attestation-demo-deploy-helm attestation-demo-apply-policy
+PHONY: deploy-db deploy cluster services-container run-services-container clean-services-container attestation-server wait-for-server attestation-policy attestation-agent-vm attestation-demo prepare-agent-config-attestation configure-attestation-tpm-cas clean-attestation-demo attestation-demo-rebuild-agent attestation-demo-deploy-helm attestation-demo-apply-policy
