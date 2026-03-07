@@ -1511,8 +1511,9 @@ func convertPCRsToIntelFormat(pcrSelection *tpm2.TPMLPCRSelection, pcrValues *tp
 			buf = append(buf, byte(pcrCount), byte(pcrCount>>8), byte(pcrCount>>16), byte(pcrCount>>24))
 
 			// Write TPM2B_DIGEST entries for this group (max 8)
-			for i := 0; i < groupSize; i++ {
-				if digestIdx < len(pcrValues.Digests) {
+			for i := 0; i < 8; i++ {
+				if i < groupSize && digestIdx < len(pcrValues.Digests) {
+				// Real digest
 					digest := pcrValues.Digests[digestIdx]
 					digestIdx++
 
@@ -1539,21 +1540,16 @@ func convertPCRsToIntelFormat(pcrSelection *tpm2.TPMLPCRSelection, pcrValues *tp
 		}
 	}
 
-	// Add 2 bytes of padding/alignment at the end
-	// Keylime expects 740 bytes but our calculation produces 738
-	// This appears to be a structure alignment requirement
-	buf = append(buf, 0, 0)
-
-	log.NewPrefixLogger("").Infof("DEBUG convertPCRsToIntelFormat: final buffer size = %d bytes (after padding)", len(buf))
+	log.NewPrefixLogger("").Infof("DEBUG convertPCRsToIntelFormat: final buffer size = %d bytes", len(buf))
 
 	// Dump buffer structure for debugging
 	logger := log.NewPrefixLogger("")
 	logger.Infof("DEBUG: Buffer breakdown:")
 	logger.Infof("  TPML_PCR_SELECTION count offset 0: 4 bytes")
-	logger.Infof("  16 x TPMS_PCR_SELECTION offset 4: 128 bytes (total so far: 132)")
-	logger.Infof("  TPML_DIGEST count offset 132: 4 bytes (total so far: 136)")
-	logger.Infof("  Digest groups: %d bytes", len(buf)-136-2)
-	logger.Infof("  Final padding: 2 bytes")
+	logger.Infof("  16 x TPMS_PCR_SELECTION offset 4: 128 bytes (total: 132)")
+	logger.Infof("  TPML_DIGEST count offset 132: 4 bytes (total: 136)")
+	logger.Infof("  Digest groups: %d bytes (each group: 4 + 8*66 = 532 bytes)", len(buf)-136)
+	logger.Infof("  Total buffer size: %d bytes", len(buf))
 
 	return buf, nil
 }
