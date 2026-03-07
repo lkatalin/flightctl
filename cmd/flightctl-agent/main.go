@@ -106,7 +106,7 @@ func NewAgentCommand() *agentCmd {
 func (a *agentCmd) Execute() error {
 	// DEBUG VERSION TRACKER - Update this with each code change to verify running version
 	a.log.Infof("========================================")
-	a.log.Infof("AGENT DEBUG VERSION: v5 - Fixed PCR selection merging (OR bitmasks)")
+	a.log.Infof("AGENT DEBUG VERSION: v6 - Debug PCR selection and Intel format")
 	a.log.Infof("========================================")
 
 	agentInstance := agent.New(a.log, a.config, a.configFile)

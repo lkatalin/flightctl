@@ -1365,6 +1365,11 @@ func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (q
 	}
 
 	s.log.Infof("DEBUG: Total PCR values collected: %d", len(allPCRValues.Digests))
+	s.log.Infof("DEBUG: Total PCR selection entries: %d", len(allPCRSelections.PCRSelections))
+	if len(allPCRSelections.PCRSelections) > 0 {
+		merged := allPCRSelections.PCRSelections[0].PCRSelect
+		s.log.Infof("DEBUG: Final merged PCR selection: %02x %02x %02x", merged[0], merged[1], merged[2])
+	}
 
 	// Use the accumulated PCR data
 	pcrReadRspAfter := &tpm2.PCRReadResponse{
@@ -1409,6 +1414,9 @@ func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (q
 // not the standard TPM2 marshaled (big-endian) format
 func convertPCRsToIntelFormat(pcrSelection *tpm2.TPMLPCRSelection, pcrValues *tpm2.TPMLDigest) ([]byte, error) {
 	buf := make([]byte, 0, 4096)
+
+	log.NewPrefixLogger("").Infof("DEBUG convertPCRsToIntelFormat: %d PCR selection entries, %d digest values",
+		len(pcrSelection.PCRSelections), len(pcrValues.Digests))
 
 	// TPML_PCR_SELECTION:count (4 bytes, little-endian uint32)
 	// This is the number of PCR selections (hash algorithms)
@@ -1531,6 +1539,7 @@ func convertPCRsToIntelFormat(pcrSelection *tpm2.TPMLPCRSelection, pcrValues *tp
 		}
 	}
 
+	log.NewPrefixLogger("").Infof("DEBUG convertPCRsToIntelFormat: final buffer size = %d bytes", len(buf))
 	return buf, nil
 }
 
