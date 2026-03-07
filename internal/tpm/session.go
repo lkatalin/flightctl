@@ -1355,10 +1355,32 @@ func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (q
 			s.log.Infof("DEBUG: TPM returned %d PCR values in this iteration", len(pcrReadRsp.PCRValues.Digests))
 		}
 
-		// Accumulate the PCR values and selections
+		// Accumulate the PCR values
 		allPCRValues.Digests = append(allPCRValues.Digests, pcrReadRsp.PCRValues.Digests...)
+
+		// Merge PCR selections (don't append - we need to OR the bitmasks together)
+		// When TPM returns PCRs in chunks, each chunk has the same hash algorithm
+		// but different PCR bits set. We need to combine them into a single selection.
 		if len(pcrReadRsp.PCRSelectionOut.PCRSelections) > 0 {
-			allPCRSelections.PCRSelections = append(allPCRSelections.PCRSelections, pcrReadRsp.PCRSelectionOut.PCRSelections...)
+			newSel := pcrReadRsp.PCRSelectionOut.PCRSelections[0]
+
+			// Check if we already have a selection for this hash algorithm
+			found := false
+			for i := range allPCRSelections.PCRSelections {
+				if allPCRSelections.PCRSelections[i].Hash == newSel.Hash {
+					// Merge by ORing the bitmasks together
+					for j := 0; j < len(newSel.PCRSelect) && j < len(allPCRSelections.PCRSelections[i].PCRSelect); j++ {
+						allPCRSelections.PCRSelections[i].PCRSelect[j] |= newSel.PCRSelect[j]
+					}
+					found = true
+					break
+				}
+			}
+
+			// If this is a new hash algorithm, append it
+			if !found {
+				allPCRSelections.PCRSelections = append(allPCRSelections.PCRSelections, newSel)
+			}
 		}
 
 		// Check if we got all requested PCRs by comparing what we got vs what we requested
