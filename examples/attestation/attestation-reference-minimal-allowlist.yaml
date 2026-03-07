@@ -1,0 +1,24 @@
+apiVersion: v1beta1
+kind: AttestationReference
+metadata:
+  name: default-ima-policy
+spec:
+  # Match all enrollments
+  matchAll: true
+
+  # MINIMAL allowlist with just 3 critical files
+  # Format: <sha256-hash> <filepath>
+  # Keylime will check that these files match the IMA log
+  # Any files NOT in the allowlist are ignored (more permissive)
+  runtimePolicy: |
+    5203641d151cfc15c5b0d9bb5476c2b487f77133db4b9b83f4a096666007d977f /init
+    15c69aa6c6611a42a7a658c75a9cd843b4b00b9a7bbb815d529a5bd5cbdcb9e /usr/bin/kmod
+    685b87d5558451aea54eb9a0f772d48e97d119ebd3ab2166f542cdee3f839841 /usr/lib64/ld-linux-x86-64.so.2
+
+  # TPM policy with mask 0x4ff (PCRs 0-7 and 10 for IMA)
+  tpmPolicy: |
+    {"mask": "0x4ff"}
+
+  # Measured boot policy - empty disables MB validation
+  mbPolicy: |
+    {}

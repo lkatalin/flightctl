@@ -395,6 +395,28 @@ func (h *ServiceHandler) processAttestationWithKeylime(ctx context.Context, orgI
 	// Note: Keylime's _tpm2_checkquote() expects base64-encoded TPM2B_PUBLIC,
 	// which it internally converts to PEM before passing to the low-level checkquote() function.
 	// The agent already sends TPM2B_PUBLIC in base64 format, so we pass it directly.
+	// For allowlist-based IMA policies, don't send the full IMA measurement list
+	// This avoids template hash validation issues with SHA1/SHA256 mismatch
+	// Keylime will use the allowlist in runtimePolicy instead
+	var imaMeasurementList *string
+	if attestationPkg.Data.ImaMeasurementList != nil && attestationRef.Spec.RuntimePolicy != nil {
+		// Check if runtime policy looks like allowlist format (simple text, not JSON)
+		// Allowlist format: hash filepath (one per line)
+		// JSON format: {"meta": {...}, "digests": {...}}
+		policyStr := strings.TrimSpace(*attestationRef.Spec.RuntimePolicy)
+		isAllowlist := !strings.HasPrefix(policyStr, "{")
+
+		if isAllowlist {
+			h.log.Infof("Using allowlist-based IMA policy, NOT sending full IMA measurement list to avoid template hash issues")
+			imaMeasurementList = nil
+		} else {
+			h.log.Infof("Using JSON-based IMA policy, sending full IMA measurement list")
+			imaMeasurementList = attestationPkg.Data.ImaMeasurementList
+		}
+	} else {
+		imaMeasurementList = attestationPkg.Data.ImaMeasurementList
+	}
+
 	resultStatus, err := h.keylimeClient.VerifyAttestation(
 		ctx,
 		deviceID,
@@ -405,7 +427,7 @@ func (h *ServiceHandler) processAttestationWithKeylime(ctx context.Context, orgI
 		attestationRef.Spec.MbPolicy,
 		attestationRef.Spec.RuntimePolicy,
 		attestationRef.Spec.TpmPolicy,
-		attestationPkg.Data.ImaMeasurementList,
+		imaMeasurementList,
 		attestationPkg.Data.MbLog,
 	)
 	if err != nil {
