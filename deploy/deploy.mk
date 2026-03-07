@@ -276,6 +276,9 @@ clean-attestation-demo: clean-agent-vm clean-cluster
 	rm -rf bin/.rpm
 	rm -rf bin/osbuild-cache/
 	rm -rf bin/output/
+	rm -f bin/.e2e-agent-images-*
+	rm -f bin/.e2e-agent-certs
+	rm -f bin/.e2e-agent-injected
 
 # Rebuild agent from source with cache clearing to pick up code changes
 attestation-demo-rebuild-agent: attestation-server wait-for-server
@@ -293,6 +296,8 @@ attestation-demo-rebuild-agent: attestation-server wait-for-server
 	rm -rf bin/osbuild-cache/
 	rm -rf bin/output/
 	rm -f bin/.e2e-agent-images-*
+	rm -f bin/.e2e-agent-certs
+	rm -f bin/.e2e-agent-injected
 	@echo ""
 	@echo "Step 3: Rebuilding agent RPM and disk image from source..."
 	$(MAKE) AGENT_OS_ID=cs9-bootc e2e-agent-images
