@@ -1,0 +1,270 @@
+
+================================================================================
+ATTESTATION REQUEST/RESPONSE LOG
+================================================================================
+Enrollment Request ID: qv56itrki0e7e3e4otpqj4mr80h5ape7becoo7jr6b6i54faggng
+Request Sent:          2026-03-07T03:06:50.02450719Z
+Response Received:     2026-03-07T03:06:50.359428909Z
+Duration:              334.921718ms
+
+--- REQUEST SENT TO KEYLIME ---
+{
+  "data": {
+    "hash_alg": "sha256",
+    "ima_measurement_list": "\u003cTRUNCATED: 292436 bytes total\u003e",
+    "nonce": "QSjptgLzlY+XzLIPlhVOnPRhNis=",
+    "quote": "\u003cTRUNCATED: 1171 bytes total\u003e",
+    "runtime_policy": "\u003cTRUNCATED: 15026914 bytes total, first 200 chars: {\"meta\":{\"version\":1,\"generator\":2,\"timestamp\":\"2026-03-07T02:58:32Z\"},\"release\":0,\"digests\":{\"/sysroot/ostree/repo/config\":[\"156a18a80ebe599c0682116489bbed7921fec09757dd96e5bf9827f25015f881\"],\"/sysro...\u003e",
+    "tpm_ak": "AFgAIwALAAUAcgAAABAAGAALAAMAEAAgV504igh1YGT2Tw+6rTlaSMlNQOOreGBcZtiQ8OdNcUQAIDLtuKHTC4EyavUoTvMXaBYQ2NeQ4V0SDGsAah7R4oBk",
+    "tpm_ek": "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEA2seVSLefJn92TnxZGIeUE5AsZ9rie4rSyYYYakb+3Mwo+9xtf8awrWVa5vD8qI65HhoMxbQhhGPSX6sCdsaNwWL806PuXik/zFlBEwkifM3O9+7Ldybf/CGCoef29ZqLzw5XUMeWLjlqcnD2mzoGGG6TcXVSA4KlRcRzKp6Kqhz+Ia0O1qnkNeer32XDavVOnP8Hb2vFY6RjHu+AHhatlWaTINjcHSMdyOS3IZqFkCPZTEOJYiV+bZBlytmK21HaS/cGvNj7EFj1boEyAtBlaUh3kCytD1tBk/iut9aUMCR1fZ9o8f2xWOfI/E8WqwW1bTkpOXAXlaNTRhSfumL+rQ==",
+    "tpm_policy": "{\"mask\":\"0xff\"}"
+  },
+  "type": "tpm"
+}
+
+--- RESPONSE RECEIVED FROM KEYLIME ---
+ERROR: attestation validation failed: [{"context":{"error":"The digest used for quoting is different than the one that was calculated","message":"Quote data validation"},"type":"qoute_validation.quote_validation"}]
+
+
+================================================================================
+ATTESTATION REQUEST/RESPONSE LOG
+================================================================================
+Enrollment Request ID: qv56itrki0e7e3e4otpqj4mr80h5ape7becoo7jr6b6i54faggng
+Request Sent:          2026-03-07T03:09:08.440671206Z
+Response Received:     2026-03-07T03:09:08.745062427Z
+Duration:              304.391226ms
+
+--- REQUEST SENT TO KEYLIME ---
+{
+  "data": {
+    "hash_alg": "sha256",
+    "ima_measurement_list": "\u003cTRUNCATED: 308685 bytes total\u003e",
+    "nonce": "N75xb0+qSN1En1NY1968ASQwIKc=",
+    "quote": "\u003cTRUNCATED: 1171 bytes total\u003e",
+    "runtime_policy": "\u003cTRUNCATED: 15026914 bytes total, first 200 chars: {\"meta\":{\"version\":1,\"generator\":2,\"timestamp\":\"2026-03-07T02:58:32Z\"},\"release\":0,\"digests\":{\"/sysroot/ostree/repo/config\":[\"156a18a80ebe599c0682116489bbed7921fec09757dd96e5bf9827f25015f881\"],\"/sysro...\u003e",
+    "tpm_ak": "AFgAIwALAAUAcgAAABAAGAALAAMAEAAgV504igh1YGT2Tw+6rTlaSMlNQOOreGBcZtiQ8OdNcUQAIDLtuKHTC4EyavUoTvMXaBYQ2NeQ4V0SDGsAah7R4oBk",
+    "tpm_ek": "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEA2seVSLefJn92TnxZGIeUE5AsZ9rie4rSyYYYakb+3Mwo+9xtf8awrWVa5vD8qI65HhoMxbQhhGPSX6sCdsaNwWL806PuXik/zFlBEwkifM3O9+7Ldybf/CGCoef29ZqLzw5XUMeWLjlqcnD2mzoGGG6TcXVSA4KlRcRzKp6Kqhz+Ia0O1qnkNeer32XDavVOnP8Hb2vFY6RjHu+AHhatlWaTINjcHSMdyOS3IZqFkCPZTEOJYiV+bZBlytmK21HaS/cGvNj7EFj1boEyAtBlaUh3kCytD1tBk/iut9aUMCR1fZ9o8f2xWOfI/E8WqwW1bTkpOXAXlaNTRhSfumL+rQ==",
+    "tpm_policy": "{\"mask\":\"0xff\"}"
+  },
+  "type": "tpm"
+}
+
+--- RESPONSE RECEIVED FROM KEYLIME ---
+ERROR: attestation validation failed: [{"context":{"error":"The digest used for quoting is different than the one that was calculated","message":"Quote data validation"},"type":"qoute_validation.quote_validation"}]
+
+
+================================================================================
+ATTESTATION REQUEST/RESPONSE LOG
+================================================================================
+Enrollment Request ID: qv56itrki0e7e3e4otpqj4mr80h5ape7becoo7jr6b6i54faggng
+Request Sent:          2026-03-07T03:11:27.166885666Z
+Response Received:     2026-03-07T03:11:27.458660596Z
+Duration:              291.774927ms
+
+--- REQUEST SENT TO KEYLIME ---
+{
+  "data": {
+    "hash_alg": "sha256",
+    "ima_measurement_list": "\u003cTRUNCATED: 309355 bytes total\u003e",
+    "nonce": "M8smKdz4z/m6nKEU1V7KTvJ83EY=",
+    "quote": "\u003cTRUNCATED: 1171 bytes total\u003e",
+    "runtime_policy": "\u003cTRUNCATED: 15026914 bytes total, first 200 chars: {\"meta\":{\"version\":1,\"generator\":2,\"timestamp\":\"2026-03-07T02:58:32Z\"},\"release\":0,\"digests\":{\"/sysroot/ostree/repo/config\":[\"156a18a80ebe599c0682116489bbed7921fec09757dd96e5bf9827f25015f881\"],\"/sysro...\u003e",
+    "tpm_ak": "AFgAIwALAAUAcgAAABAAGAALAAMAEAAgV504igh1YGT2Tw+6rTlaSMlNQOOreGBcZtiQ8OdNcUQAIDLtuKHTC4EyavUoTvMXaBYQ2NeQ4V0SDGsAah7R4oBk",
+    "tpm_ek": "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEA2seVSLefJn92TnxZGIeUE5AsZ9rie4rSyYYYakb+3Mwo+9xtf8awrWVa5vD8qI65HhoMxbQhhGPSX6sCdsaNwWL806PuXik/zFlBEwkifM3O9+7Ldybf/CGCoef29ZqLzw5XUMeWLjlqcnD2mzoGGG6TcXVSA4KlRcRzKp6Kqhz+Ia0O1qnkNeer32XDavVOnP8Hb2vFY6RjHu+AHhatlWaTINjcHSMdyOS3IZqFkCPZTEOJYiV+bZBlytmK21HaS/cGvNj7EFj1boEyAtBlaUh3kCytD1tBk/iut9aUMCR1fZ9o8f2xWOfI/E8WqwW1bTkpOXAXlaNTRhSfumL+rQ==",
+    "tpm_policy": "{\"mask\":\"0xff\"}"
+  },
+  "type": "tpm"
+}
+
+--- RESPONSE RECEIVED FROM KEYLIME ---
+ERROR: attestation validation failed: [{"context":{"error":"The digest used for quoting is different than the one that was calculated","message":"Quote data validation"},"type":"qoute_validation.quote_validation"}]
+
+
+================================================================================
+ATTESTATION REQUEST/RESPONSE LOG
+================================================================================
+Enrollment Request ID: qv56itrki0e7e3e4otpqj4mr80h5ape7becoo7jr6b6i54faggng
+Request Sent:          2026-03-07T03:13:45.388337668Z
+Response Received:     2026-03-07T03:13:45.664284288Z
+Duration:              275.946621ms
+
+--- REQUEST SENT TO KEYLIME ---
+{
+  "data": {
+    "hash_alg": "sha256",
+    "ima_measurement_list": "\u003cTRUNCATED: 311116 bytes total\u003e",
+    "nonce": "M5HYvKoBMwrz0LteKzaQYTJ6IyA=",
+    "quote": "\u003cTRUNCATED: 1171 bytes total\u003e",
+    "runtime_policy": "\u003cTRUNCATED: 15026914 bytes total, first 200 chars: {\"meta\":{\"version\":1,\"generator\":2,\"timestamp\":\"2026-03-07T02:58:32Z\"},\"release\":0,\"digests\":{\"/sysroot/ostree/repo/config\":[\"156a18a80ebe599c0682116489bbed7921fec09757dd96e5bf9827f25015f881\"],\"/sysro...\u003e",
+    "tpm_ak": "AFgAIwALAAUAcgAAABAAGAALAAMAEAAgV504igh1YGT2Tw+6rTlaSMlNQOOreGBcZtiQ8OdNcUQAIDLtuKHTC4EyavUoTvMXaBYQ2NeQ4V0SDGsAah7R4oBk",
+    "tpm_ek": "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEA2seVSLefJn92TnxZGIeUE5AsZ9rie4rSyYYYakb+3Mwo+9xtf8awrWVa5vD8qI65HhoMxbQhhGPSX6sCdsaNwWL806PuXik/zFlBEwkifM3O9+7Ldybf/CGCoef29ZqLzw5XUMeWLjlqcnD2mzoGGG6TcXVSA4KlRcRzKp6Kqhz+Ia0O1qnkNeer32XDavVOnP8Hb2vFY6RjHu+AHhatlWaTINjcHSMdyOS3IZqFkCPZTEOJYiV+bZBlytmK21HaS/cGvNj7EFj1boEyAtBlaUh3kCytD1tBk/iut9aUMCR1fZ9o8f2xWOfI/E8WqwW1bTkpOXAXlaNTRhSfumL+rQ==",
+    "tpm_policy": "{\"mask\":\"0xff\"}"
+  },
+  "type": "tpm"
+}
+
+--- RESPONSE RECEIVED FROM KEYLIME ---
+ERROR: attestation validation failed: [{"context":{"error":"The digest used for quoting is different than the one that was calculated","message":"Quote data validation"},"type":"qoute_validation.quote_validation"}]
+
+
+================================================================================
+ATTESTATION REQUEST/RESPONSE LOG
+================================================================================
+Enrollment Request ID: qv56itrki0e7e3e4otpqj4mr80h5ape7becoo7jr6b6i54faggng
+Request Sent:          2026-03-07T03:16:03.818611769Z
+Response Received:     2026-03-07T03:16:04.085511067Z
+Duration:              266.899297ms
+
+--- REQUEST SENT TO KEYLIME ---
+{
+  "data": {
+    "hash_alg": "sha256",
+    "ima_measurement_list": "\u003cTRUNCATED: 311934 bytes total\u003e",
+    "nonce": "GgrjbDlCM8IzjfoyGy5okAB3bxQ=",
+    "quote": "\u003cTRUNCATED: 1171 bytes total\u003e",
+    "runtime_policy": "\u003cTRUNCATED: 15026914 bytes total, first 200 chars: {\"meta\":{\"version\":1,\"generator\":2,\"timestamp\":\"2026-03-07T02:58:32Z\"},\"release\":0,\"digests\":{\"/sysroot/ostree/repo/config\":[\"156a18a80ebe599c0682116489bbed7921fec09757dd96e5bf9827f25015f881\"],\"/sysro...\u003e",
+    "tpm_ak": "AFgAIwALAAUAcgAAABAAGAALAAMAEAAgV504igh1YGT2Tw+6rTlaSMlNQOOreGBcZtiQ8OdNcUQAIDLtuKHTC4EyavUoTvMXaBYQ2NeQ4V0SDGsAah7R4oBk",
+    "tpm_ek": "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEA2seVSLefJn92TnxZGIeUE5AsZ9rie4rSyYYYakb+3Mwo+9xtf8awrWVa5vD8qI65HhoMxbQhhGPSX6sCdsaNwWL806PuXik/zFlBEwkifM3O9+7Ldybf/CGCoef29ZqLzw5XUMeWLjlqcnD2mzoGGG6TcXVSA4KlRcRzKp6Kqhz+Ia0O1qnkNeer32XDavVOnP8Hb2vFY6RjHu+AHhatlWaTINjcHSMdyOS3IZqFkCPZTEOJYiV+bZBlytmK21HaS/cGvNj7EFj1boEyAtBlaUh3kCytD1tBk/iut9aUMCR1fZ9o8f2xWOfI/E8WqwW1bTkpOXAXlaNTRhSfumL+rQ==",
+    "tpm_policy": "{\"mask\":\"0xff\"}"
+  },
+  "type": "tpm"
+}
+
+--- RESPONSE RECEIVED FROM KEYLIME ---
+ERROR: attestation validation failed: [{"context":{"error":"The digest used for quoting is different than the one that was calculated","message":"Quote data validation"},"type":"qoute_validation.quote_validation"}]
+
+
+================================================================================
+ATTESTATION REQUEST/RESPONSE LOG
+================================================================================
+Enrollment Request ID: qv56itrki0e7e3e4otpqj4mr80h5ape7becoo7jr6b6i54faggng
+Request Sent:          2026-03-07T03:18:22.183139705Z
+Response Received:     2026-03-07T03:18:22.470590839Z
+Duration:              287.451135ms
+
+--- REQUEST SENT TO KEYLIME ---
+{
+  "data": {
+    "hash_alg": "sha256",
+    "ima_measurement_list": "\u003cTRUNCATED: 315428 bytes total\u003e",
+    "nonce": "GJ7TMxiQMlHznMJLDdQLLZftekw=",
+    "quote": "\u003cTRUNCATED: 1171 bytes total\u003e",
+    "runtime_policy": "\u003cTRUNCATED: 15026914 bytes total, first 200 chars: {\"meta\":{\"version\":1,\"generator\":2,\"timestamp\":\"2026-03-07T02:58:32Z\"},\"release\":0,\"digests\":{\"/sysroot/ostree/repo/config\":[\"156a18a80ebe599c0682116489bbed7921fec09757dd96e5bf9827f25015f881\"],\"/sysro...\u003e",
+    "tpm_ak": "AFgAIwALAAUAcgAAABAAGAALAAMAEAAgV504igh1YGT2Tw+6rTlaSMlNQOOreGBcZtiQ8OdNcUQAIDLtuKHTC4EyavUoTvMXaBYQ2NeQ4V0SDGsAah7R4oBk",
+    "tpm_ek": "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEA2seVSLefJn92TnxZGIeUE5AsZ9rie4rSyYYYakb+3Mwo+9xtf8awrWVa5vD8qI65HhoMxbQhhGPSX6sCdsaNwWL806PuXik/zFlBEwkifM3O9+7Ldybf/CGCoef29ZqLzw5XUMeWLjlqcnD2mzoGGG6TcXVSA4KlRcRzKp6Kqhz+Ia0O1qnkNeer32XDavVOnP8Hb2vFY6RjHu+AHhatlWaTINjcHSMdyOS3IZqFkCPZTEOJYiV+bZBlytmK21HaS/cGvNj7EFj1boEyAtBlaUh3kCytD1tBk/iut9aUMCR1fZ9o8f2xWOfI/E8WqwW1bTkpOXAXlaNTRhSfumL+rQ==",
+    "tpm_policy": "{\"mask\":\"0xff\"}"
+  },
+  "type": "tpm"
+}
+
+--- RESPONSE RECEIVED FROM KEYLIME ---
+ERROR: attestation validation failed: [{"context":{"error":"The digest used for quoting is different than the one that was calculated","message":"Quote data validation"},"type":"qoute_validation.quote_validation"}]
+
+
+================================================================================
+ATTESTATION REQUEST/RESPONSE LOG
+================================================================================
+Enrollment Request ID: qv56itrki0e7e3e4otpqj4mr80h5ape7becoo7jr6b6i54faggng
+Request Sent:          2026-03-07T03:20:40.747709443Z
+Response Received:     2026-03-07T03:20:41.024339287Z
+Duration:              276.629844ms
+
+--- REQUEST SENT TO KEYLIME ---
+{
+  "data": {
+    "hash_alg": "sha256",
+    "ima_measurement_list": "\u003cTRUNCATED: 317078 bytes total\u003e",
+    "nonce": "Pa5qNP5CLSyqqRpuKJRGGqb1xSA=",
+    "quote": "\u003cTRUNCATED: 1171 bytes total\u003e",
+    "runtime_policy": "\u003cTRUNCATED: 15026914 bytes total, first 200 chars: {\"meta\":{\"version\":1,\"generator\":2,\"timestamp\":\"2026-03-07T02:58:32Z\"},\"release\":0,\"digests\":{\"/sysroot/ostree/repo/config\":[\"156a18a80ebe599c0682116489bbed7921fec09757dd96e5bf9827f25015f881\"],\"/sysro...\u003e",
+    "tpm_ak": "AFgAIwALAAUAcgAAABAAGAALAAMAEAAgV504igh1YGT2Tw+6rTlaSMlNQOOreGBcZtiQ8OdNcUQAIDLtuKHTC4EyavUoTvMXaBYQ2NeQ4V0SDGsAah7R4oBk",
+    "tpm_ek": "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEA2seVSLefJn92TnxZGIeUE5AsZ9rie4rSyYYYakb+3Mwo+9xtf8awrWVa5vD8qI65HhoMxbQhhGPSX6sCdsaNwWL806PuXik/zFlBEwkifM3O9+7Ldybf/CGCoef29ZqLzw5XUMeWLjlqcnD2mzoGGG6TcXVSA4KlRcRzKp6Kqhz+Ia0O1qnkNeer32XDavVOnP8Hb2vFY6RjHu+AHhatlWaTINjcHSMdyOS3IZqFkCPZTEOJYiV+bZBlytmK21HaS/cGvNj7EFj1boEyAtBlaUh3kCytD1tBk/iut9aUMCR1fZ9o8f2xWOfI/E8WqwW1bTkpOXAXlaNTRhSfumL+rQ==",
+    "tpm_policy": "{\"mask\":\"0xff\"}"
+  },
+  "type": "tpm"
+}
+
+--- RESPONSE RECEIVED FROM KEYLIME ---
+ERROR: attestation validation failed: [{"context":{"error":"The digest used for quoting is different than the one that was calculated","message":"Quote data validation"},"type":"qoute_validation.quote_validation"}]
+
+
+================================================================================
+ATTESTATION REQUEST/RESPONSE LOG
+================================================================================
+Enrollment Request ID: qv56itrki0e7e3e4otpqj4mr80h5ape7becoo7jr6b6i54faggng
+Request Sent:          2026-03-07T03:22:59.169798953Z
+Response Received:     2026-03-07T03:22:59.460847868Z
+Duration:              291.048919ms
+
+--- REQUEST SENT TO KEYLIME ---
+{
+  "data": {
+    "hash_alg": "sha256",
+    "ima_measurement_list": "\u003cTRUNCATED: 318186 bytes total\u003e",
+    "nonce": "0iBkMlzq+qHgFBvyvKj1LUKxhC0=",
+    "quote": "\u003cTRUNCATED: 1171 bytes total\u003e",
+    "runtime_policy": "\u003cTRUNCATED: 15026914 bytes total, first 200 chars: {\"meta\":{\"version\":1,\"generator\":2,\"timestamp\":\"2026-03-07T02:58:32Z\"},\"release\":0,\"digests\":{\"/sysroot/ostree/repo/config\":[\"156a18a80ebe599c0682116489bbed7921fec09757dd96e5bf9827f25015f881\"],\"/sysro...\u003e",
+    "tpm_ak": "AFgAIwALAAUAcgAAABAAGAALAAMAEAAgV504igh1YGT2Tw+6rTlaSMlNQOOreGBcZtiQ8OdNcUQAIDLtuKHTC4EyavUoTvMXaBYQ2NeQ4V0SDGsAah7R4oBk",
+    "tpm_ek": "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEA2seVSLefJn92TnxZGIeUE5AsZ9rie4rSyYYYakb+3Mwo+9xtf8awrWVa5vD8qI65HhoMxbQhhGPSX6sCdsaNwWL806PuXik/zFlBEwkifM3O9+7Ldybf/CGCoef29ZqLzw5XUMeWLjlqcnD2mzoGGG6TcXVSA4KlRcRzKp6Kqhz+Ia0O1qnkNeer32XDavVOnP8Hb2vFY6RjHu+AHhatlWaTINjcHSMdyOS3IZqFkCPZTEOJYiV+bZBlytmK21HaS/cGvNj7EFj1boEyAtBlaUh3kCytD1tBk/iut9aUMCR1fZ9o8f2xWOfI/E8WqwW1bTkpOXAXlaNTRhSfumL+rQ==",
+    "tpm_policy": "{\"mask\":\"0xff\"}"
+  },
+  "type": "tpm"
+}
+
+--- RESPONSE RECEIVED FROM KEYLIME ---
+ERROR: attestation validation failed: [{"context":{"error":"The digest used for quoting is different than the one that was calculated","message":"Quote data validation"},"type":"qoute_validation.quote_validation"}]
+
+
+================================================================================
+ATTESTATION REQUEST/RESPONSE LOG
+================================================================================
+Enrollment Request ID: 5u2jii8sm5cvadvmtdjg6btfqfjogv22oj4475900sjlbghk9840
+Request Sent:          2026-03-07T03:24:54.340264751Z
+Response Received:     2026-03-07T03:24:54.604616978Z
+Duration:              264.352228ms
+
+--- REQUEST SENT TO KEYLIME ---
+{
+  "data": {
+    "hash_alg": "sha256",
+    "ima_measurement_list": "\u003cTRUNCATED: 319176 bytes total\u003e",
+    "nonce": "J9PtQPvz3XQsknO3QYzXJZrd89c=",
+    "quote": "\u003cTRUNCATED: 1171 bytes total\u003e",
+    "runtime_policy": "\u003cTRUNCATED: 15026914 bytes total, first 200 chars: {\"meta\":{\"version\":1,\"generator\":2,\"timestamp\":\"2026-03-07T02:58:32Z\"},\"release\":0,\"digests\":{\"/sysroot/ostree/repo/config\":[\"156a18a80ebe599c0682116489bbed7921fec09757dd96e5bf9827f25015f881\"],\"/sysro...\u003e",
+    "tpm_ak": "AFgAIwALAAUAcgAAABAAGAALAAMAEAAgL5UxOpK4qzYsgWpiT2MWjptYR+WHy43P/ZKcS66hhIYAIKiUgw/pR6ksQIgaVgSisTU4lD6Xr6uesJUp1FWaI6QO",
+    "tpm_ek": "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEA2seVSLefJn92TnxZGIeUE5AsZ9rie4rSyYYYakb+3Mwo+9xtf8awrWVa5vD8qI65HhoMxbQhhGPSX6sCdsaNwWL806PuXik/zFlBEwkifM3O9+7Ldybf/CGCoef29ZqLzw5XUMeWLjlqcnD2mzoGGG6TcXVSA4KlRcRzKp6Kqhz+Ia0O1qnkNeer32XDavVOnP8Hb2vFY6RjHu+AHhatlWaTINjcHSMdyOS3IZqFkCPZTEOJYiV+bZBlytmK21HaS/cGvNj7EFj1boEyAtBlaUh3kCytD1tBk/iut9aUMCR1fZ9o8f2xWOfI/E8WqwW1bTkpOXAXlaNTRhSfumL+rQ==",
+    "tpm_policy": "{\"mask\":\"0xff\"}"
+  },
+  "type": "tpm"
+}
+
+--- RESPONSE RECEIVED FROM KEYLIME ---
+ERROR: attestation validation failed: [{"context":{"error":"The digest used for quoting is different than the one that was calculated","message":"Quote data validation"},"type":"qoute_validation.quote_validation"}]
+
+
+================================================================================
+ATTESTATION REQUEST/RESPONSE LOG
+================================================================================
+Enrollment Request ID: 5u2jii8sm5cvadvmtdjg6btfqfjogv22oj4475900sjlbghk9840
+Request Sent:          2026-03-07T03:27:12.711536674Z
+Response Received:     2026-03-07T03:27:12.99791734Z
+Duration:              286.380666ms
+
+--- REQUEST SENT TO KEYLIME ---
+{
+  "data": {
+    "hash_alg": "sha256",
+    "ima_measurement_list": "\u003cTRUNCATED: 328708 bytes total\u003e",
+    "nonce": "T7qlDVHla1RR9yvPm6TsRz8CIFs=",
+    "quote": "\u003cTRUNCATED: 1171 bytes total\u003e",
+    "runtime_policy": "\u003cTRUNCATED: 15026914 bytes total, first 200 chars: {\"meta\":{\"version\":1,\"generator\":2,\"timestamp\":\"2026-03-07T02:58:32Z\"},\"release\":0,\"digests\":{\"/sysroot/ostree/repo/config\":[\"156a18a80ebe599c0682116489bbed7921fec09757dd96e5bf9827f25015f881\"],\"/sysro...\u003e",
+    "tpm_ak": "AFgAIwALAAUAcgAAABAAGAALAAMAEAAgL5UxOpK4qzYsgWpiT2MWjptYR+WHy43P/ZKcS66hhIYAIKiUgw/pR6ksQIgaVgSisTU4lD6Xr6uesJUp1FWaI6QO",
+    "tpm_ek": "AToAAQALAAMAsgAgg3GXZ0SEs/gakMyNRqXXJP1S124GUgtk8qHaGzMUaaoABgCAAEMAEAgAAAAAAAEA2seVSLefJn92TnxZGIeUE5AsZ9rie4rSyYYYakb+3Mwo+9xtf8awrWVa5vD8qI65HhoMxbQhhGPSX6sCdsaNwWL806PuXik/zFlBEwkifM3O9+7Ldybf/CGCoef29ZqLzw5XUMeWLjlqcnD2mzoGGG6TcXVSA4KlRcRzKp6Kqhz+Ia0O1qnkNeer32XDavVOnP8Hb2vFY6RjHu+AHhatlWaTINjcHSMdyOS3IZqFkCPZTEOJYiV+bZBlytmK21HaS/cGvNj7EFj1boEyAtBlaUh3kCytD1tBk/iut9aUMCR1fZ9o8f2xWOfI/E8WqwW1bTkpOXAXlaNTRhSfumL+rQ==",
+    "tpm_policy": "{\"mask\":\"0xff\"}"
+  },
+  "type": "tpm"
+}
+
+--- RESPONSE RECEIVED FROM KEYLIME ---
+ERROR: attestation validation failed: [{"context":{"error":"The digest used for quoting is different than the one that was calculated","message":"Quote data validation"},"type":"qoute_validation.quote_validation"}]
+

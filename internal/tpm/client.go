@@ -365,6 +365,12 @@ func (c *client) GenerateQuote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection
 	if pcrSelection == nil {
 		pcrSelection = createFullPCRSelection()
 	}
+	// DEBUG: Log the PCR selection bytes being used
+	if len(pcrSelection.PCRSelections) > 0 {
+		sel := pcrSelection.PCRSelections[0].PCRSelect
+		c.log.Infof("DEBUG: PCR selection bytes: %02x %02x %02x (should be ff 04 00 for PCRs 0-7 and 10)",
+			sel[0], sel[1], sel[2])
+	}
 	return c.session.Quote(nonce, pcrSelection)
 }
 

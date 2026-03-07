@@ -1341,6 +1341,13 @@ func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (q
 		return nil, nil, nil, fmt.Errorf("reading PCRs after quote: %w", err)
 	}
 
+	// DEBUG: Log what the TPM actually returned
+	if len(pcrReadRspAfter.PCRSelectionOut.PCRSelections) > 0 {
+		selOut := pcrReadRspAfter.PCRSelectionOut.PCRSelections[0].PCRSelect
+		s.log.Infof("DEBUG: TPM returned PCR selection: %02x %02x %02x", selOut[0], selOut[1], selOut[2])
+		s.log.Infof("DEBUG: TPM returned %d PCR values", len(pcrReadRspAfter.PCRValues.Digests))
+	}
+
 	// Marshal the quote and signature
 	quoteMarshalFull := tpm2.Marshal(quoteRsp.Quoted)
 	signatureMarshalFull := tpm2.Marshal(quoteRsp.Signature)
