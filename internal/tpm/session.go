@@ -1332,20 +1332,69 @@ func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (q
 	// Read PCR values IMMEDIATELY AFTER the quote to get the values that match the quote
 	// This minimizes the window where PCRs could change between quote and read
 	// For IMA PCRs which are constantly extending, this is critical
-	pcrReadCmdAfter := tpm2.PCRRead{
-		PCRSelectionIn: *pcrSelection,
+	//
+	// Note: TPM may return PCRs in multiple chunks, so we loop until all are retrieved
+	allPCRValues := tpm2.TPMLDigest{Digests: []tpm2.TPMTHA{}}
+	allPCRSelections := tpm2.TPMLPCRSelection{PCRSelections: []tpm2.TPMSPCRSelection{}}
+	remainingSelection := *pcrSelection
+
+	for {
+		pcrReadCmd := tpm2.PCRRead{
+			PCRSelectionIn: remainingSelection,
+		}
+
+		pcrReadRsp, err := pcrReadCmd.Execute(transport.FromReadWriter(s.conn))
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("reading PCRs after quote: %w", err)
+		}
+
+		// DEBUG: Log what the TPM returned in this iteration
+		if len(pcrReadRsp.PCRSelectionOut.PCRSelections) > 0 {
+			selOut := pcrReadRsp.PCRSelectionOut.PCRSelections[0].PCRSelect
+			s.log.Infof("DEBUG: TPM read iteration returned PCR selection: %02x %02x %02x", selOut[0], selOut[1], selOut[2])
+			s.log.Infof("DEBUG: TPM returned %d PCR values in this iteration", len(pcrReadRsp.PCRValues.Digests))
+		}
+
+		// Accumulate the PCR values and selections
+		allPCRValues.Digests = append(allPCRValues.Digests, pcrReadRsp.PCRValues.Digests...)
+		if len(pcrReadRsp.PCRSelectionOut.PCRSelections) > 0 {
+			allPCRSelections.PCRSelections = append(allPCRSelections.PCRSelections, pcrReadRsp.PCRSelectionOut.PCRSelections...)
+		}
+
+		// Check if we got all requested PCRs by comparing what we got vs what we requested
+		// If PCRSelectionOut matches remainingSelection, we're done
+		// Otherwise, calculate what's still missing and loop again
+		gotAll := true
+		if len(pcrReadRsp.PCRSelectionOut.PCRSelections) > 0 && len(remainingSelection.PCRSelections) > 0 {
+			requested := remainingSelection.PCRSelections[0].PCRSelect
+			returned := pcrReadRsp.PCRSelectionOut.PCRSelections[0].PCRSelect
+
+			// Check if any requested bits are missing from the returned selection
+			for i := 0; i < len(requested) && i < len(returned); i++ {
+				if (requested[i] & ^returned[i]) != 0 {
+					// There are bits in requested that are not in returned
+					gotAll = false
+					// Update remaining selection to request only the missing PCRs
+					remainingSelection.PCRSelections[0].PCRSelect[i] = requested[i] & ^returned[i]
+				} else {
+					remainingSelection.PCRSelections[0].PCRSelect[i] = 0
+				}
+			}
+		}
+
+		if gotAll {
+			break
+		}
+
+		s.log.Infof("DEBUG: TPM did not return all PCRs, reading remaining...")
 	}
 
-	pcrReadRspAfter, err := pcrReadCmdAfter.Execute(transport.FromReadWriter(s.conn))
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("reading PCRs after quote: %w", err)
-	}
+	s.log.Infof("DEBUG: Total PCR values collected: %d", len(allPCRValues.Digests))
 
-	// DEBUG: Log what the TPM actually returned
-	if len(pcrReadRspAfter.PCRSelectionOut.PCRSelections) > 0 {
-		selOut := pcrReadRspAfter.PCRSelectionOut.PCRSelections[0].PCRSelect
-		s.log.Infof("DEBUG: TPM returned PCR selection: %02x %02x %02x", selOut[0], selOut[1], selOut[2])
-		s.log.Infof("DEBUG: TPM returned %d PCR values", len(pcrReadRspAfter.PCRValues.Digests))
+	// Use the accumulated PCR data
+	pcrReadRspAfter := &tpm2.PCRReadResponse{
+		PCRSelectionOut: allPCRSelections,
+		PCRValues:       allPCRValues,
 	}
 
 	// Marshal the quote and signature
