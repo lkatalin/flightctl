@@ -270,10 +270,12 @@ attestation-demo-agent-vm: attestation-agent-vm
 attestation-demo-apply-policy: attestation-policy
 
 clean-attestation-demo: clean-agent-vm clean-cluster
-	@echo "Removing agent bundle and RPM to force rebuild..."
-	rm -f bin/agent-artifacts/agent-images-bundle*.tar
+	@echo "Removing agent bundle, RPM, and build caches to force rebuild..."
+	rm -rf bin/agent-artifacts/
 	rm -rf bin/rpm/flightctl-agent-*.rpm
 	rm -rf bin/.rpm
+	rm -rf bin/osbuild-cache/
+	rm -rf bin/output/
 
 # Rebuild agent from source with cache clearing to pick up code changes
 attestation-demo-rebuild-agent: attestation-server wait-for-server
@@ -284,12 +286,13 @@ attestation-demo-rebuild-agent: attestation-server wait-for-server
 	@echo "Step 1: Clearing Go build cache..."
 	@go clean -cache
 	@echo ""
-	@echo "Step 2: Removing agent bundle, RPM, and disk image to force rebuild..."
-	rm -f bin/agent-artifacts/agent-images-bundle*.tar
-	rm -f bin/output/qcow2/disk.qcow2
-	rm -f bin/.e2e-agent-images-*
+	@echo "Step 2: Removing agent bundle, RPM, disk image, and build caches to force rebuild..."
+	rm -rf bin/agent-artifacts/
 	rm -rf bin/rpm/flightctl-agent-*.rpm
 	rm -rf bin/.rpm
+	rm -rf bin/osbuild-cache/
+	rm -rf bin/output/
+	rm -f bin/.e2e-agent-images-*
 	@echo ""
 	@echo "Step 3: Rebuilding agent RPM and disk image from source..."
 	$(MAKE) e2e-agent-images
