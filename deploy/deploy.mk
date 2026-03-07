@@ -227,7 +227,7 @@ attestation-agent-vm:
 	touch bin/.e2e-agent-certs
 	@if [ ! -f bin/output/qcow2/disk.qcow2 ]; then \
 		echo "Disk image not found, building e2e-agent-images..."; \
-		$(MAKE) -j1 e2e-agent-images; \
+		$(MAKE) -j1 AGENT_OS_ID=cs9-bootc e2e-agent-images; \
 	fi
 	$(MAKE) -j1 agent-vm
 	@echo ""
@@ -295,7 +295,7 @@ attestation-demo-rebuild-agent: attestation-server wait-for-server
 	rm -f bin/.e2e-agent-images-*
 	@echo ""
 	@echo "Step 3: Rebuilding agent RPM and disk image from source..."
-	$(MAKE) e2e-agent-images
+	$(MAKE) AGENT_OS_ID=cs9-bootc e2e-agent-images
 	@echo ""
 	@echo "Step 4: Generating new measurements.txt from rebuilt image..."
 	@echo "  (This happens automatically during e2e-agent-images)"
