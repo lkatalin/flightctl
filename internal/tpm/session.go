@@ -1287,7 +1287,7 @@ func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (q
 	// For IMA PCRs which are constantly extending, this is critical
 	//
 	// Note: TPM may return PCRs in multiple chunks, so we loop until all are retrieved
-	allPCRValues := tpm2.TPMLDigest{Digests: []tpm2.TPMTHA{}}
+	allPCRValues := tpm2.TPMLDigest{Digests: []tpm2.TPM2BDigest{}}
 	allPCRSelections := tpm2.TPMLPCRSelection{PCRSelections: []tpm2.TPMSPCRSelection{}}
 	remainingSelection := *pcrSelection
 
