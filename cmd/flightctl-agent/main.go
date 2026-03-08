@@ -106,7 +106,7 @@ func NewAgentCommand() *agentCmd {
 func (a *agentCmd) Execute() error {
 	// DEBUG VERSION TRACKER - Update this with each code change to verify running version
 	a.log.Infof("========================================")
-	a.log.Infof("AGENT DEBUG VERSION: v8 - Fixed TPML_DIGEST to always write 8 slots")
+	a.log.Infof("AGENT DEBUG VERSION: v10 - Working on template hash validation")
 	a.log.Infof("========================================")
 
 	agentInstance := agent.New(a.log, a.config, a.configFile)
