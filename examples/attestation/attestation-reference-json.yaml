@@ -24,7 +24,7 @@ spec:
       "keyrings": {},
       "ima": {
         "ignored_keyrings": [],
-        "log_hash_alg": "sha256",
+        "log_hash_alg": "sha1",
         "dm_policy": null
       },
       "ima-buf": {},

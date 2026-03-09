@@ -27,7 +27,7 @@ func TestDetectFormat(t *testing.T) {
 				"digests": {},
 				"excludes": [],
 				"keyrings": {},
-				"ima": {"ignored_keyrings": [], "log_hash_alg": "sha256", "dm_policy": null},
+				"ima": {"ignored_keyrings": [], "log_hash_alg": "sha1", "dm_policy": null},
 				"ima-buf": {},
 				"verification-keys": ""
 			}`,
@@ -259,7 +259,7 @@ def456abc123def456abc123def456abc123def456abc123def456abc123def4 /usr/bin/ls`,
 				"digests": {"/usr/bin/bash": ["abc123def456abc123def456abc123def456abc123def456abc123def456abc1"]},
 				"excludes": [],
 				"keyrings": {},
-				"ima": {"ignored_keyrings": [], "log_hash_alg": "sha256", "dm_policy": null},
+				"ima": {"ignored_keyrings": [], "log_hash_alg": "sha1", "dm_policy": null},
 				"ima-buf": {},
 				"verification-keys": ""
 			}`,
