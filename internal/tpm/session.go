@@ -1418,6 +1418,16 @@ func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (q
 		s.log.Infof("DEBUG: Final merged PCR selection: %02x %02x %02x", merged[0], merged[1], merged[2])
 	}
 
+	// DEBUG: Print PCR values, especially PCR 10 for IMA
+	s.log.Infof("DEBUG: PCR values read from TPM:")
+	for i, digest := range allPCRValues.Digests {
+		if len(digest.Buffer) > 0 {
+			// Try to identify which PCR this is based on the selection bitmask
+			// PCR 10 is bit 10 in byte 1 (bit 2 of byte 1)
+			s.log.Infof("DEBUG:   PCR[%d]: %x", i, digest.Buffer)
+		}
+	}
+
 	// Use the accumulated PCR data
 	pcrReadRspAfter := &tpm2.PCRReadResponse{
 		PCRSelectionOut: allPCRSelections,

@@ -189,6 +189,20 @@ func (c *Client) VerifyAttestation(ctx context.Context, deviceID string, aikTpm 
 	if runtimePolicy != nil && *runtimePolicy != "" {
 		c.log.Infof("DEBUG: Setting req.Data.RuntimePolicy, size: %d bytes", len(*runtimePolicy))
 		c.log.Infof("DEBUG: RuntimePolicy first 100 chars: %.100s", *runtimePolicy)
+
+		// Parse and log excludes to verify they're being sent
+		var policyData map[string]interface{}
+		if err := json.Unmarshal([]byte(*runtimePolicy), &policyData); err == nil {
+			if excludes, ok := policyData["excludes"]; ok {
+				excludesJSON, _ := json.Marshal(excludes)
+				c.log.Infof("DEBUG: RuntimePolicy excludes: %s", string(excludesJSON))
+			} else {
+				c.log.Warnf("DEBUG: RuntimePolicy has NO excludes field")
+			}
+		} else {
+			c.log.Warnf("DEBUG: Failed to parse RuntimePolicy JSON: %v", err)
+		}
+
 		req.Data.RuntimePolicy = runtimePolicy
 	} else {
 		c.log.Warnf("DEBUG: RuntimePolicy is nil or empty, NOT setting req.Data.RuntimePolicy")
