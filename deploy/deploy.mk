@@ -305,11 +305,11 @@ attestation-demo-rebuild-agent: attestation-server wait-for-server
 	@echo "Step 4: Generating new measurements.txt from rebuilt image..."
 	@echo "  (This happens automatically during e2e-agent-images)"
 	@echo ""
-	@echo "Step 5: Creating AttestationReference from new measurements..."
-	examples/attestation/create-attestation-ref-from-measurements.sh
-	@echo ""
-	@echo "Step 6: Applying updated AttestationReference..."
-	bin/flightctl apply -f examples/attestation/attestation-reference-from-measurements.yaml
+	# TEMPORARILY DISABLED: 	@echo "Step 5: Creating AttestationReference from new measurements..."
+	# TEMPORARILY DISABLED: 	examples/attestation/create-attestation-ref-from-measurements.sh
+	# TEMPORARILY DISABLED: 	@echo ""
+	# TEMPORARILY DISABLED: 	@echo "Step 6: Applying updated AttestationReference..."
+	# TEMPORARILY DISABLED: 	bin/flightctl apply -f examples/attestation/attestation-reference-from-measurements.yaml
 	@echo ""
 	@echo "Step 7: Starting agent VM..."
 	$(MAKE) attestation-agent-vm
