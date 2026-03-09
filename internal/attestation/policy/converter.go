@@ -95,23 +95,18 @@ func ParseAllowlist(content string) (*RuntimePolicy, error) {
 		return nil, fmt.Errorf("no valid digest entries found in allowlist")
 	}
 
-	// Determine hash algorithm based on first hash length
-	hashAlg := "sha256" // default
-	for _, hashes := range digests {
-		if len(hashes) > 0 {
-			switch len(hashes[0]) {
-			case 40:
-				hashAlg = "sha1"
-			case 64:
-				hashAlg = "sha256"
-			case 96:
-				hashAlg = "sha384"
-			case 128:
-				hashAlg = "sha512"
-			}
-			break
-		}
-	}
+	// NOTE: We detect the FILE CONTENT hash algorithm (sha1, sha256, etc.) from the
+	// hash length in the measurements, but this is different from the IMA template hash
+	// algorithm. File content hashes can be SHA256, SHA512, etc., but IMA template hashes
+	// are always SHA1 for standard ima-ng format. The file hash algorithm is embedded in
+	// the IMA template data but doesn't affect the template hash calculation itself.
+
+	// IMA template hashes are ALWAYS SHA1 for standard ima-ng format,
+	// regardless of the file content hash algorithm.
+	// The ima.log_hash_alg setting tells Keylime what hash algorithm
+	// the IMA log uses for TEMPLATE hashes (not file content hashes).
+	// For ima-ng templates, this is always sha1.
+	templateHashAlg := "sha1"
 
 	policy := &RuntimePolicy{
 		Meta: Meta{
@@ -125,7 +120,7 @@ func ParseAllowlist(content string) (*RuntimePolicy, error) {
 		Keyrings: make(map[string][]string),
 		IMA: IMAConfig{
 			IgnoredKeyrings: []string{},
-			LogHashAlg:      hashAlg,
+			LogHashAlg:      templateHashAlg, // Always sha1 for ima-ng template hashes
 			DMPolicy:        nil,
 		},
 		IMABuf:           make(map[string][]string),
