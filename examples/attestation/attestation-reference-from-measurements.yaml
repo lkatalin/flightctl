@@ -60301,7 +60301,7 @@ spec:
     e8957eb85373c93c8995a149d5cb12eee6fa2599b553b4210189d96bf59a23b9  /usr/bin/checkmodule
     6015dc369981569a40c9d3698c5b87ed610962b9f0ab1ac86d45f60841020751  /usr/bin/checkpolicy
     c1700a9915fad6a81bc97e8aebcdd7e53c8a6c2222a6740c26e9585a2da5602a  /usr/bin/distro
-    5ec93e393349440f79b027e4977a702f752a2dc2e6a6f19d3b7053bc5093ae4a  /usr/bin/flightctl-agent
+    8d650f9e05c37f9569f84abdd3b70c49ed3098d6ea9011da025146c0b698b81a  /usr/bin/flightctl-agent
     75fa16c560d9da386a69ab7b193674cacc217b1460383c5c7dfb6784a1a32e2f  /usr/bin/flightctl-must-gather
     8fa36aec41a55c4a4d82de548ef9323945b03e614ac5533c4cca1124dcc75b4a  /usr/bin/sedismod
     c65debe62c4e605d8c126fa30c4aa866768249193ce6410a3a22c0669a6a1505  /usr/bin/sedispol
@@ -61849,6 +61849,7 @@ spec:
     35e0a5478cf7ff7189a60b51bcbffa50dea93bfd98580219c25dadde9f160c91  /usr/lib/.build-id/50/ee4e16ae62e0615cfdab55b9a5ba0ecc02bea9
     76786de89b49227060c73bd07c9136999f4a9b4adde12fcb05d0cea8073b7cfc  /usr/lib/.build-id/50/decaf72a7fa2f4d09950e6f3727a26b075c356
     92dd5b4bd07d239d1f0224addb39b448401897c9c66d0d9494a892e6b97e319b  /usr/lib/.build-id/50/c9c38be968078d99a77f94656a2aa535bcbf9c
+    8d650f9e05c37f9569f84abdd3b70c49ed3098d6ea9011da025146c0b698b81a  /usr/lib/.build-id/51/f7033b43e6f6f87792186a6fefaa186f1c2df1
     b42c427d5c1492bfd01f626aab54a2e9f656818e6065afea4cee6675c86f4405  /usr/lib/.build-id/51/98476527efcba0154b60311a68c690a68ccad9
     16d88bfb8526d6d5a08167d2d3684d3b37212672108af11aecb9393330fca52c  /usr/lib/.build-id/51/0489afda2d4f52659c9748080919742a5b8a63
     30f31bb50eda12e9c4ba46e369ecb2e03aa6d9be8a97124aa45a61fc000d0605  /usr/lib/.build-id/51/ec755a24417fbe09a9d5e26fec3785da3ff396
@@ -62646,7 +62647,6 @@ spec:
     254b8b82b89822a8ebbb80195070ebe11dad4f8d492671e586a383df24b5f9f7  /usr/lib/.build-id/b2/a16de6d8d79d71b4b122e4fe6f69bbb9b1ea67
     4da1a922a9f0b6f5ed19abc891f0004c2e2c5f1a4dc283394c9403ff3816f3ad  /usr/lib/.build-id/b2/74ca7b3d9b0c7667b3ac4e764da5e938a1a1d0
     f57764c1ef8cd5226735b6685372d59a8e1f72c43ea539db94312ea63b22ef09  /usr/lib/.build-id/b2/36b2984cca8e4935036793f355dd2de23978eb
-    5ec93e393349440f79b027e4977a702f752a2dc2e6a6f19d3b7053bc5093ae4a  /usr/lib/.build-id/b3/3bf441f70397a9087f7ff16881dae3654670c1
     897c6beaefdf2547af49df27b865d8f21772cfc8e0a875cad8d2393b20727517  /usr/lib/.build-id/b3/d4a4a3e9b1870210d215da2bd2b7830b778381
     a45ec5bfbe51194f3822be5549aa9767886e6c6fae8838503a435e88d9d30c15  /usr/lib/.build-id/b3/957f81d652a264680c6c7be82adb9c4e1370c2
     c64c364c4ca62dee52483bc4526567ba10c94a4c868fd7793879a3fdac43f636  /usr/lib/.build-id/b3/43f24d1c6399c57358c28ee456cd4e44837758
@@ -81786,7 +81786,7 @@ spec:
     60a0bdfbb321c923ae02cdc88cbf2586ee2d3fa328493a5753b81a5be3050569  /usr/lib64/libnss_compat.so.2
     03217e36a06df298273eb2c8887b5be8077edb9538e51043526f5bb5d5e06d50  /usr/lib64/libc_malloc_debug.so.0
     68872e8576d7c6cb629bee742a20241da1f461988b295f2471d5f5de04fe7cce  /usr/lib64/libresolv.so.2
-    0000000000000000000000000000000000000000000000000000000000000000  /usr/lib64/libc.so.6
+    6ff9a4e83e1bf5f4347a5d9af83b1eaa77de592dd1f8f0a3d7edf8f2ab3bd16e  /usr/lib64/libc.so.6
     14169c301f428ed99f4695e632d8176ef16ca00dd6b181a4feb1e983252ac812  /usr/lib64/libnss_files.so.2
     f4247309c4be9b4849045484dd6eca30bb4644becba57204bd855461870c1251  /usr/lib64/libdl.so.2
     e49fd2487f7bac4446d950a6e73b0e5e135b068c5f3e34aa26de292e47adee4c  /usr/lib64/libcrypto.so.3.5.5
@@ -93365,7 +93365,7 @@ spec:
     9a00e607520fd628a792a7aa2d0b3a857dfcc1bdc3be55910d5853a79efc3cc4  /usr/share/python3-wheels/pip-21.3.1-py3-none-any.whl
     31563e95b93936ad816e900394c114e11df33f70a96a79bd9ee9bbb96d189286  /usr/share/python3-wheels/setuptools-53.0.0-py3-none-any.whl
     f97c323ca3d1d887d3d74093cb7a46da7ec8be69726a87076cf1f88235a564b2  /usr/share/rhel/secrets/redhat.repo
-    b41ea0bae460d14d490e48eba9c3f382de40d3f6e5e8f2051361d1306c7d07fa  /usr/share/rpm/rpmdb.sqlite
+    0f395ee3562ec62d8ef18d99e0aeb7ac3329cf38026c6224082f9b87372afa66  /usr/share/rpm/rpmdb.sqlite
     fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb  /usr/share/rpm/rpmdb.sqlite-shm
     e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /usr/share/rpm/rpmdb.sqlite-wal
     e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /usr/share/rpm/.rpm.lock
@@ -95395,10 +95395,11 @@ spec:
     b34c3e2873d7a61b7f7192ccca8bb7af8e8f90ef88b99bb52cc93e5c06042f50  /usr/share/buildinfo/labels.json
     61779c6b6e4d51b0d16cc256bac9eb5b2f19bdf06b718e95778509c92b7b569d  /usr/share/magic
 
-  # TPM policy with mask 0x0 means no PCR verification
-  # Only IMA runtime measurements will be checked
+  # TPM policy includes PCRs 0-7 (boot measurements) and PCR 10 (IMA)
+  # PCR 10 must be included for Keylime to perform IMA runtime verification
+  # Mask 0x4ff = bits 0-7 (0xFF) + bit 10 (0x400) = PCRs 0-7 and 10
   tpmPolicy: |
-    {"mask": "0x0"}
+    {"mask": "0x4ff"}
 
   # Measured boot policy - empty JSON disables measured boot validation
   mbPolicy: |
