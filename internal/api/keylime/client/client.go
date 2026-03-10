@@ -112,6 +112,13 @@ func logAttestationToFile(deviceID string, requestData map[string]interface{}, r
 	if data, ok := requestPretty["data"].(map[string]interface{}); ok {
 		if rp, exists := data["runtime_policy"]; exists {
 			if rpStr, ok := rp.(string); ok && len(rpStr) > 500 {
+				// Extract and log excludes before truncating
+				var policyObj map[string]interface{}
+				if err := json.Unmarshal([]byte(rpStr), &policyObj); err == nil {
+					if excludes, hasExcludes := policyObj["excludes"]; hasExcludes {
+						data["runtime_policy_excludes"] = excludes
+					}
+				}
 				data["runtime_policy"] = fmt.Sprintf("<TRUNCATED: %d bytes total, first 200 chars: %.200s...>", len(rpStr), rpStr)
 			}
 		}

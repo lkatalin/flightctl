@@ -246,7 +246,7 @@ configure-attestation-tpm-cas:
 	test/scripts/add-certs-to-deployment.sh bin/tpm-cas
 
 # Complete attestation demo: deploys server, applies policy, boots agent VM
-attestation-demo: attestation-server wait-for-server attestation-policy attestation-agent-vm
+attestation-demo: attestation-server wait-for-server attestation-policy
 	@echo ""
 	@echo "=========================================="
 	@echo "Attestation Demo Environment Ready!"
