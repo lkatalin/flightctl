@@ -1,11 +1,14 @@
 package tpm
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/asn1"
 	"errors"
 	"fmt"
 	"io"
 	"math/big"
+	"time"
 
 	"github.com/flightctl/flightctl/pkg/log"
 	gotpmclient "github.com/google/go-tpm-tools/client"
@@ -1242,181 +1245,290 @@ func (s *tpmSession) RemoveApplicationKey(appName string) error {
 	return nil
 }
 
+// computePCRDigest calculates the digest of selected PCR values
+// This matches how TPM computes the pcrDigest field in TPMS_ATTEST
+func computePCRDigest(pcrSelection *tpm2.TPMLPCRSelection, pcrValues *tpm2.TPMLDigest) ([]byte, error) {
+	if pcrSelection == nil || len(pcrSelection.PCRSelections) == 0 {
+		return nil, fmt.Errorf("empty PCR selection")
+	}
+	if pcrValues == nil || len(pcrValues.Digests) == 0 {
+		return nil, fmt.Errorf("empty PCR values")
+	}
+
+	// Concatenate all PCR values in the selection
+	var pcrData bytes.Buffer
+	for _, digest := range pcrValues.Digests {
+		pcrData.Write(digest.Buffer)
+	}
+
+	// Hash with SHA256 (matching the hash algorithm used for signing)
+	hash := sha256.Sum256(pcrData.Bytes())
+	return hash[:], nil
+}
+
+// extractPCRDigestFromQuote extracts the pcrDigest from a TPMS_ATTEST quote structure
+// The quote is expected to be the raw TPMS_ATTEST (without TPM2B length prefix)
+func extractPCRDigestFromQuote(quoteMarshal []byte) ([]byte, error) {
+	// TPMS_ATTEST structure:
+	// - magic: TPM_GENERATED (4 bytes)
+	// - type: TPMI_ST_ATTEST (2 bytes)
+	// - qualifiedSigner: TPM2B_NAME (2 byte size + name)
+	// - extraData: TPM2B_DATA (2 byte size + data)
+	// - clockInfo: TPMS_CLOCK_INFO (17 bytes)
+	// - firmwareVersion: UINT64 (8 bytes)
+	// - attested: TPMU_ATTEST (for quote: TPMS_QUOTE_INFO)
+	//   - pcrSelect: TPML_PCR_SELECTION
+	//   - pcrDigest: TPM2B_DIGEST (2 byte size + digest)
+
+	if len(quoteMarshal) < 4 {
+		return nil, fmt.Errorf("quote too short: %d bytes", len(quoteMarshal))
+	}
+
+	// Parse using tpm2 library
+	attest, err := tpm2.Unmarshal[tpm2.TPMSAttest](quoteMarshal)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshaling TPMS_ATTEST: %w", err)
+	}
+
+	// Check this is a quote attestation
+	if attest.Type != tpm2.TPMSTAttestQuote {
+		return nil, fmt.Errorf("not a quote attestation, type=%d", attest.Type)
+	}
+
+	// Extract the quote info which contains pcrDigest
+	quoteInfo, err := attest.Attested.Quote()
+	if err != nil {
+		return nil, fmt.Errorf("extracting quote info: %w", err)
+	}
+
+	return quoteInfo.PCRDigest.Buffer, nil
+}
+
 // Quote generates a TPM quote with PCR values using the LAK
-// To avoid PCR timing races, this function reads PCRs immediately before generating
-// the quote to minimize the window where PCR values could change
+// To avoid PCR timing races with IMA (PCR 10), this function validates that the
+// PCR values read match the pcrDigest in the quote, retrying if they don't match.
+// This handles the race where IMA extends PCR 10 between quote generation and PCR read.
 func (s *tpmSession) Quote(nonce []byte, pcrSelection *tpm2.TPMLPCRSelection) (quote []byte, signature []byte, pcrs []byte, err error) {
-	// Load LAK if not already loaded
+	const maxRetries = 5
+	const retryDelay = 10 * time.Millisecond
+
+	// Load LAK if not already loaded (only once, outside retry loop)
 	lakHandle, err := s.LoadKey(LAK)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("loading LAK: %w", err)
 	}
 
-	// Create qualifying data from nonce
+	// Create qualifying data from nonce (only once, outside retry loop)
 	qualifyingData := tpm2.TPM2BData{
 		Buffer: nonce,
 	}
 
-	// Execute TPM2_Quote command first
-	quoteCmd := tpm2.Quote{
-		SignHandle: tpm2.AuthHandle{
-			Handle: lakHandle.Handle,
-			Name:   lakHandle.Name,
-			Auth:   tpm2.PasswordAuth(nil),
-		},
-		QualifyingData: qualifyingData,
-		PCRSelect:      *pcrSelection,
-		InScheme: tpm2.TPMTSigScheme{
-			Scheme: tpm2.TPMAlgECDSA,
-			Details: tpm2.NewTPMUSigScheme(
-				tpm2.TPMAlgECDSA,
-				&tpm2.TPMSSchemeHash{
-					HashAlg: tpm2.TPMAlgSHA256,
-				},
-			),
-		},
-	}
-
-	quoteRsp, err := quoteCmd.Execute(transport.FromReadWriter(s.conn))
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("executing TPM2_Quote: %w", err)
-	}
-
-	// Read PCR values IMMEDIATELY AFTER the quote to get the values that match the quote
-	// This minimizes the window where PCRs could change between quote and read
-	// For IMA PCRs which are constantly extending, this is critical
-	//
-	// Note: TPM may return PCRs in multiple chunks, so we loop until all are retrieved
-	allPCRValues := tpm2.TPMLDigest{Digests: []tpm2.TPM2BDigest{}}
-	allPCRSelections := tpm2.TPMLPCRSelection{PCRSelections: []tpm2.TPMSPCRSelection{}}
-	remainingSelection := *pcrSelection
-
-	for {
-		pcrReadCmd := tpm2.PCRRead{
-			PCRSelectionIn: remainingSelection,
+	// Retry loop to handle PCR timing races
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		if attempt > 1 {
+			s.log.Warnf("Quote PCR digest mismatch, retry attempt %d/%d after %v", attempt, maxRetries, retryDelay)
+			time.Sleep(retryDelay)
 		}
 
-		pcrReadRsp, err := pcrReadCmd.Execute(transport.FromReadWriter(s.conn))
+		// Execute TPM2_Quote command first
+		quoteCmd := tpm2.Quote{
+			SignHandle: tpm2.AuthHandle{
+				Handle: lakHandle.Handle,
+				Name:   lakHandle.Name,
+				Auth:   tpm2.PasswordAuth(nil),
+			},
+			QualifyingData: qualifyingData,
+			PCRSelect:      *pcrSelection,
+			InScheme: tpm2.TPMTSigScheme{
+				Scheme: tpm2.TPMAlgECDSA,
+				Details: tpm2.NewTPMUSigScheme(
+					tpm2.TPMAlgECDSA,
+					&tpm2.TPMSSchemeHash{
+						HashAlg: tpm2.TPMAlgSHA256,
+					},
+				),
+			},
+		}
+
+		quoteRsp, err := quoteCmd.Execute(transport.FromReadWriter(s.conn))
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("reading PCRs after quote: %w", err)
+			return nil, nil, nil, fmt.Errorf("executing TPM2_Quote: %w", err)
 		}
 
-		// DEBUG: Log what the TPM returned in this iteration
-		if len(pcrReadRsp.PCRSelectionOut.PCRSelections) > 0 {
-			selOut := pcrReadRsp.PCRSelectionOut.PCRSelections[0].PCRSelect
-			s.log.Infof("DEBUG: TPM read iteration returned PCR selection: %02x %02x %02x", selOut[0], selOut[1], selOut[2])
-			s.log.Infof("DEBUG: TPM returned %d PCR values in this iteration", len(pcrReadRsp.PCRValues.Digests))
+		// Read PCR values IMMEDIATELY AFTER the quote to get the values that match the quote
+		// This minimizes the window where PCRs could change between quote and read
+		// For IMA PCRs which are constantly extending, this is critical
+		//
+		// Note: TPM may return PCRs in multiple chunks, so we loop until all are retrieved
+		allPCRValues := tpm2.TPMLDigest{Digests: []tpm2.TPM2BDigest{}}
+		allPCRSelections := tpm2.TPMLPCRSelection{PCRSelections: []tpm2.TPMSPCRSelection{}}
+
+		// Deep copy pcrSelection to avoid modifying the original during retry attempts
+		// Shallow copy (*pcrSelection) would share the underlying slice data
+		remainingSelection := tpm2.TPMLPCRSelection{
+			PCRSelections: make([]tpm2.TPMSPCRSelection, len(pcrSelection.PCRSelections)),
+		}
+		for i := range pcrSelection.PCRSelections {
+			remainingSelection.PCRSelections[i] = tpm2.TPMSPCRSelection{
+				Hash:      pcrSelection.PCRSelections[i].Hash,
+				PCRSelect: make([]byte, len(pcrSelection.PCRSelections[i].PCRSelect)),
+			}
+			copy(remainingSelection.PCRSelections[i].PCRSelect, pcrSelection.PCRSelections[i].PCRSelect)
 		}
 
-		// Accumulate the PCR values
-		allPCRValues.Digests = append(allPCRValues.Digests, pcrReadRsp.PCRValues.Digests...)
+		for {
+			pcrReadCmd := tpm2.PCRRead{
+				PCRSelectionIn: remainingSelection,
+			}
 
-		// Merge PCR selections (don't append - we need to OR the bitmasks together)
-		// When TPM returns PCRs in chunks, each chunk has the same hash algorithm
-		// but different PCR bits set. We need to combine them into a single selection.
-		if len(pcrReadRsp.PCRSelectionOut.PCRSelections) > 0 {
-			newSel := pcrReadRsp.PCRSelectionOut.PCRSelections[0]
+			pcrReadRsp, err := pcrReadCmd.Execute(transport.FromReadWriter(s.conn))
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("reading PCRs after quote: %w", err)
+			}
 
-			// Check if we already have a selection for this hash algorithm
-			found := false
-			for i := range allPCRSelections.PCRSelections {
-				if allPCRSelections.PCRSelections[i].Hash == newSel.Hash {
-					// Merge by ORing the bitmasks together
-					for j := 0; j < len(newSel.PCRSelect) && j < len(allPCRSelections.PCRSelections[i].PCRSelect); j++ {
-						allPCRSelections.PCRSelections[i].PCRSelect[j] |= newSel.PCRSelect[j]
+			// DEBUG: Log what the TPM returned in this iteration
+			if len(pcrReadRsp.PCRSelectionOut.PCRSelections) > 0 {
+				selOut := pcrReadRsp.PCRSelectionOut.PCRSelections[0].PCRSelect
+				s.log.Infof("DEBUG: TPM read iteration returned PCR selection: %02x %02x %02x", selOut[0], selOut[1], selOut[2])
+				s.log.Infof("DEBUG: TPM returned %d PCR values in this iteration", len(pcrReadRsp.PCRValues.Digests))
+			}
+
+			// Accumulate the PCR values
+			allPCRValues.Digests = append(allPCRValues.Digests, pcrReadRsp.PCRValues.Digests...)
+
+			// Merge PCR selections (don't append - we need to OR the bitmasks together)
+			// When TPM returns PCRs in chunks, each chunk has the same hash algorithm
+			// but different PCR bits set. We need to combine them into a single selection.
+			if len(pcrReadRsp.PCRSelectionOut.PCRSelections) > 0 {
+				newSel := pcrReadRsp.PCRSelectionOut.PCRSelections[0]
+
+				// Check if we already have a selection for this hash algorithm
+				found := false
+				for i := range allPCRSelections.PCRSelections {
+					if allPCRSelections.PCRSelections[i].Hash == newSel.Hash {
+						// Merge by ORing the bitmasks together
+						for j := 0; j < len(newSel.PCRSelect) && j < len(allPCRSelections.PCRSelections[i].PCRSelect); j++ {
+							allPCRSelections.PCRSelections[i].PCRSelect[j] |= newSel.PCRSelect[j]
+						}
+						found = true
+						break
 					}
-					found = true
-					break
+				}
+
+				// If this is a new hash algorithm, append it
+				if !found {
+					allPCRSelections.PCRSelections = append(allPCRSelections.PCRSelections, newSel)
 				}
 			}
 
-			// If this is a new hash algorithm, append it
-			if !found {
-				allPCRSelections.PCRSelections = append(allPCRSelections.PCRSelections, newSel)
-			}
-		}
+			// Check if we got all requested PCRs by comparing what we got vs what we requested
+			// If PCRSelectionOut matches remainingSelection, we're done
+			// Otherwise, calculate what's still missing and loop again
+			gotAll := true
+			if len(pcrReadRsp.PCRSelectionOut.PCRSelections) > 0 && len(remainingSelection.PCRSelections) > 0 {
+				requested := remainingSelection.PCRSelections[0].PCRSelect
+				returned := pcrReadRsp.PCRSelectionOut.PCRSelections[0].PCRSelect
 
-		// Check if we got all requested PCRs by comparing what we got vs what we requested
-		// If PCRSelectionOut matches remainingSelection, we're done
-		// Otherwise, calculate what's still missing and loop again
-		gotAll := true
-		if len(pcrReadRsp.PCRSelectionOut.PCRSelections) > 0 && len(remainingSelection.PCRSelections) > 0 {
-			requested := remainingSelection.PCRSelections[0].PCRSelect
-			returned := pcrReadRsp.PCRSelectionOut.PCRSelections[0].PCRSelect
-
-			// Check if any requested bits are missing from the returned selection
-			for i := 0; i < len(requested) && i < len(returned); i++ {
-				if (requested[i] & ^returned[i]) != 0 {
-					// There are bits in requested that are not in returned
-					gotAll = false
-					// Update remaining selection to request only the missing PCRs
-					remainingSelection.PCRSelections[0].PCRSelect[i] = requested[i] & ^returned[i]
-				} else {
-					remainingSelection.PCRSelections[0].PCRSelect[i] = 0
+				// Check if any requested bits are missing from the returned selection
+				for i := 0; i < len(requested) && i < len(returned); i++ {
+					if (requested[i] & ^returned[i]) != 0 {
+						// There are bits in requested that are not in returned
+						gotAll = false
+						// Update remaining selection to request only the missing PCRs
+						remainingSelection.PCRSelections[0].PCRSelect[i] = requested[i] & ^returned[i]
+					} else {
+						remainingSelection.PCRSelections[0].PCRSelect[i] = 0
+					}
 				}
 			}
+
+			if gotAll {
+				break
+			}
+
+			s.log.Infof("DEBUG: TPM did not return all PCRs, reading remaining...")
 		}
 
-		if gotAll {
-			break
+		s.log.Infof("DEBUG: Total PCR values collected: %d", len(allPCRValues.Digests))
+		s.log.Infof("DEBUG: Total PCR selection entries: %d", len(allPCRSelections.PCRSelections))
+		if len(allPCRSelections.PCRSelections) > 0 {
+			merged := allPCRSelections.PCRSelections[0].PCRSelect
+			s.log.Infof("DEBUG: Final merged PCR selection: %02x %02x %02x", merged[0], merged[1], merged[2])
 		}
 
-		s.log.Infof("DEBUG: TPM did not return all PCRs, reading remaining...")
-	}
-
-	s.log.Infof("DEBUG: Total PCR values collected: %d", len(allPCRValues.Digests))
-	s.log.Infof("DEBUG: Total PCR selection entries: %d", len(allPCRSelections.PCRSelections))
-	if len(allPCRSelections.PCRSelections) > 0 {
-		merged := allPCRSelections.PCRSelections[0].PCRSelect
-		s.log.Infof("DEBUG: Final merged PCR selection: %02x %02x %02x", merged[0], merged[1], merged[2])
-	}
-
-	// DEBUG: Print PCR values, especially PCR 10 for IMA
-	s.log.Infof("DEBUG: PCR values read from TPM:")
-	for i, digest := range allPCRValues.Digests {
-		if len(digest.Buffer) > 0 {
-			// Try to identify which PCR this is based on the selection bitmask
-			// PCR 10 is bit 10 in byte 1 (bit 2 of byte 1)
-			s.log.Infof("DEBUG:   PCR[%d]: %x", i, digest.Buffer)
+		// DEBUG: Print PCR values, especially PCR 10 for IMA
+		s.log.Infof("DEBUG: PCR values read from TPM:")
+		for i, digest := range allPCRValues.Digests {
+			if len(digest.Buffer) > 0 {
+				// Try to identify which PCR this is based on the selection bitmask
+				// PCR 10 is bit 10 in byte 1 (bit 2 of byte 1)
+				s.log.Infof("DEBUG:   PCR[%d]: %x", i, digest.Buffer)
+			}
 		}
+
+		// Use the accumulated PCR data
+		pcrReadRspAfter := &tpm2.PCRReadResponse{
+			PCRSelectionOut: allPCRSelections,
+			PCRValues:       allPCRValues,
+		}
+
+		// Marshal the quote and signature
+		quoteMarshalFull := tpm2.Marshal(quoteRsp.Quoted)
+		signatureMarshalFull := tpm2.Marshal(quoteRsp.Signature)
+
+		// Keylime expects raw TPM structures without TPM2B length prefixes:
+		// - Quote should be TPMS_ATTEST (without TPM2B_ATTEST wrapper)
+		// - Signature should be TPMT_SIGNATURE (full structure including sigAlg field)
+		//
+		// quoteRsp.Quoted is TPM2BAttest which marshals with a 2-byte length prefix
+		// Strip the TPM2B prefix from quote
+		if len(quoteMarshalFull) < 2 {
+			return nil, nil, nil, fmt.Errorf("marshaled quote too short: %d bytes", len(quoteMarshalFull))
+		}
+		quoteMarshal := quoteMarshalFull[2:]
+
+		// quoteRsp.Signature is TPMTSignature - this is the full TPMT_SIGNATURE structure
+		// TPMT_SIGNATURE starts with sigAlg (2 bytes, e.g. 0x0018 for ECDSA), then hash alg, then signature data
+		// Keylime expects the complete TPMT_SIGNATURE, so DON'T strip anything
+		signatureMarshal := signatureMarshalFull
+
+		// Convert PCR values read after the quote to Intel tpm2-tools format
+		// We use the PCR values read AFTER the quote to match the PCR state at quote-time
+		// IMPORTANT: Use PCRSelectionOut (what TPM actually returned) not PCRSelectionIn (what we requested)
+		// TPM may not return all requested PCRs in one response
+		pcrMarshal, err := convertPCRsToIntelFormat(&pcrReadRspAfter.PCRSelectionOut, &pcrReadRspAfter.PCRValues)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("converting PCRs to Intel format: %w", err)
+		}
+
+		// Validate that the PCR digest in the quote matches the hash of the PCR values we read
+		// This detects if PCR 10 (IMA) extended between quote generation and PCR read
+		quotePCRDigest, err := extractPCRDigestFromQuote(quoteMarshal)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("extracting PCR digest from quote: %w", err)
+		}
+
+		computedPCRDigest, err := computePCRDigest(&pcrReadRspAfter.PCRSelectionOut, &pcrReadRspAfter.PCRValues)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("computing PCR digest: %w", err)
+		}
+
+		// Compare the digests
+		if bytes.Equal(quotePCRDigest, computedPCRDigest) {
+			// Success! The PCRs match the quote
+			s.log.Infof("Quote PCR digest validation successful on attempt %d", attempt)
+			return quoteMarshal, signatureMarshal, pcrMarshal, nil
+		}
+
+		// Digests don't match - PCR changed between quote and read
+		s.log.Warnf("PCR digest mismatch on attempt %d: quote=%x computed=%x (likely PCR 10 IMA race)",
+			attempt, quotePCRDigest, computedPCRDigest)
+
+		// Continue to next retry attempt (or fail if maxRetries exhausted)
 	}
 
-	// Use the accumulated PCR data
-	pcrReadRspAfter := &tpm2.PCRReadResponse{
-		PCRSelectionOut: allPCRSelections,
-		PCRValues:       allPCRValues,
-	}
-
-	// Marshal the quote and signature
-	quoteMarshalFull := tpm2.Marshal(quoteRsp.Quoted)
-	signatureMarshalFull := tpm2.Marshal(quoteRsp.Signature)
-
-	// Keylime expects raw TPM structures without TPM2B length prefixes:
-	// - Quote should be TPMS_ATTEST (without TPM2B_ATTEST wrapper)
-	// - Signature should be TPMT_SIGNATURE (full structure including sigAlg field)
-	//
-	// quoteRsp.Quoted is TPM2BAttest which marshals with a 2-byte length prefix
-	// Strip the TPM2B prefix from quote
-	if len(quoteMarshalFull) < 2 {
-		return nil, nil, nil, fmt.Errorf("marshaled quote too short: %d bytes", len(quoteMarshalFull))
-	}
-	quoteMarshal := quoteMarshalFull[2:]
-
-	// quoteRsp.Signature is TPMTSignature - this is the full TPMT_SIGNATURE structure
-	// TPMT_SIGNATURE starts with sigAlg (2 bytes, e.g. 0x0018 for ECDSA), then hash alg, then signature data
-	// Keylime expects the complete TPMT_SIGNATURE, so DON'T strip anything
-	signatureMarshal := signatureMarshalFull
-
-	// Convert PCR values read after the quote to Intel tpm2-tools format
-	// We use the PCR values read AFTER the quote to match the PCR state at quote-time
-	// IMPORTANT: Use PCRSelectionOut (what TPM actually returned) not PCRSelectionIn (what we requested)
-	// TPM may not return all requested PCRs in one response
-	pcrMarshal, err := convertPCRsToIntelFormat(&pcrReadRspAfter.PCRSelectionOut, &pcrReadRspAfter.PCRValues)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("converting PCRs to Intel format: %w", err)
-	}
-
-	return quoteMarshal, signatureMarshal, pcrMarshal, nil
+	// All retries exhausted
+	return nil, nil, nil, fmt.Errorf("failed to generate quote with matching PCR values after %d attempts (PCR 10 IMA timing race)", maxRetries)
 }
 
 // convertPCRsToIntelFormat converts TPM2 PCR values to Intel tpm2-tools format
