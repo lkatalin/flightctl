@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -22,14 +24,19 @@ func DetectFormat(content string) (FormatType, error) {
 		return FormatUnknown, fmt.Errorf("empty content")
 	}
 
+	logrus.Infof("DetectFormat: content length = %d, first 100 chars: %.100s", len(trimmed), trimmed)
+
 	// Try to parse as JSON first
 	var testPolicy RuntimePolicy
 	if err := json.Unmarshal([]byte(trimmed), &testPolicy); err == nil {
+		logrus.Info("DetectFormat: parsed as JSON successfully")
 		// Successfully parsed as JSON, verify it has the expected structure
 		if testPolicy.Meta.Version >= 0 {
+			logrus.Info("DetectFormat: detected as FormatJSON")
 			return FormatJSON, nil
 		}
 	}
+	logrus.Info("DetectFormat: not JSON, checking allowlist format")
 
 	// Check if it looks like allowlist format
 	// Should have lines matching: hash filepath
@@ -188,6 +195,21 @@ var defaultExcludes = []string{
 	".*/rpm-ostree",
 	".*/grub2-editenv",
 	".*/sshd",
+	".*/skopeo",
+	".*/setpriv",
+
+	// FlightCTL banner files (temporary files with random suffixes)
+	".*/issue\\.d/\\.flightctl-banner\\.issue.*",
+
+	// Temporary network configuration files
+	".*/resolv\\.conf\\..*",
+	".*/NetworkManager/internal-.*",
+
+	// bootc runtime storage
+	"/run/bootc/.*",
+
+	// OSTree repository refs
+	"/sysroot/ostree/repo/refs/.*",
 }
 
 // LoadExcludes reads exclude patterns from a file
@@ -226,6 +248,8 @@ func LoadExcludes(excludesPath string) ([]string, error) {
 // Input format: <hash> <filepath> per line
 // Example: "abc123... /usr/bin/bash"
 func ParseAllowlist(content string) (*RuntimePolicy, error) {
+	logrus.Infof("ParseAllowlist: called with %d bytes of content", len(content))
+	logrus.Infof("ParseAllowlist: defaultExcludes has %d patterns", len(defaultExcludes))
 	lines := strings.Split(content, "\n")
 	digests := make(map[string][]string)
 
@@ -277,6 +301,7 @@ func ParseAllowlist(content string) (*RuntimePolicy, error) {
 	// Use default excludes embedded in the code
 	// These can be overridden by reading from a file in the future
 	excludes := defaultExcludes
+	logrus.Infof("ParseAllowlist: setting excludes to defaultExcludes (%d patterns)", len(excludes))
 
 	policy := &RuntimePolicy{
 		Meta: Meta{
@@ -347,27 +372,36 @@ func ValidateRuntimePolicy(policy *RuntimePolicy) error {
 
 // ConvertToJSON converts any supported format to JSON string
 func ConvertToJSON(content string) (string, error) {
+	logrus.Infof("ConvertToJSON: called with %d bytes of content", len(content))
+
 	format, err := DetectFormat(content)
 	if err != nil {
+		logrus.Errorf("ConvertToJSON: failed to detect format: %v", err)
 		return "", fmt.Errorf("failed to detect format: %w", err)
 	}
+
+	logrus.Infof("ConvertToJSON: detected format = %v", format)
 
 	var policy *RuntimePolicy
 
 	switch format {
 	case FormatJSON:
 		// Already JSON, just validate it
+		logrus.Info("ConvertToJSON: parsing as JSON")
 		policy = &RuntimePolicy{}
 		if err := json.Unmarshal([]byte(content), policy); err != nil {
 			return "", fmt.Errorf("failed to parse JSON: %w", err)
 		}
+		logrus.Infof("ConvertToJSON: JSON policy has %d excludes", len(policy.Excludes))
 
 	case FormatAllowlist:
 		// Convert from allowlist
+		logrus.Info("ConvertToJSON: converting from allowlist format")
 		policy, err = ParseAllowlist(content)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse allowlist: %w", err)
 		}
+		logrus.Infof("ConvertToJSON: converted allowlist has %d excludes", len(policy.Excludes))
 
 	default:
 		return "", fmt.Errorf("unknown format")
@@ -384,5 +418,6 @@ func ConvertToJSON(content string) (string, error) {
 		return "", fmt.Errorf("failed to marshal to JSON: %w", err)
 	}
 
+	logrus.Infof("ConvertToJSON: successfully converted, final JSON has %d excludes", len(policy.Excludes))
 	return string(jsonBytes), nil
 }
