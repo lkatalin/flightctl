@@ -8,6 +8,7 @@ import (
 	"github.com/flightctl/flightctl/internal/domain"
 	"github.com/flightctl/flightctl/internal/store/selector"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 func (h *ServiceHandler) CreateAttestationReference(ctx context.Context, orgId uuid.UUID, attestationRef domain.AttestationReference) (*domain.AttestationReference, domain.Status) {
@@ -132,17 +133,24 @@ func (h *ServiceHandler) callbackAttestationReferenceDeleted(ctx context.Context
 
 // processRuntimePolicy auto-converts runtime policy from allowlist format to JSON if needed
 func processRuntimePolicy(attestationRef *domain.AttestationReference) error {
+	logrus.Infof("processRuntimePolicy: called for attestation reference %s", attestationRef.Metadata.Name)
+
 	if attestationRef.Spec.RuntimePolicy == nil || *attestationRef.Spec.RuntimePolicy == "" {
+		logrus.Info("processRuntimePolicy: no runtime policy to process")
 		return nil // No runtime policy to process
 	}
 
 	runtimePolicy := *attestationRef.Spec.RuntimePolicy
+	logrus.Infof("processRuntimePolicy: runtime policy length = %d bytes", len(runtimePolicy))
 
 	// Auto-detect and convert if needed
 	convertedJSON, err := attestationpolicy.ConvertToJSON(runtimePolicy)
 	if err != nil {
+		logrus.Errorf("processRuntimePolicy: conversion failed: %v", err)
 		return errors.New("invalid runtime policy: " + err.Error())
 	}
+
+	logrus.Infof("processRuntimePolicy: conversion successful, converted JSON length = %d bytes", len(convertedJSON))
 
 	// Update the runtime policy with the normalized JSON format
 	attestationRef.Spec.RuntimePolicy = &convertedJSON
