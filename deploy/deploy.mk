@@ -222,14 +222,26 @@ attestation-policy:
 attestation-agent-vm:
 	@echo "Building agent VM with attestation config and default bootc image..."
 	@echo "Ensuring attestation-enabled config is generated and injected..."
-	rm -f bin/.e2e-agent-injected
 	$(MAKE) prepare-agent-config-attestation
 	touch bin/.e2e-agent-certs
 	@if [ ! -f bin/output/qcow2/disk.qcow2 ]; then \
 		echo "Disk image not found, building e2e-agent-images..."; \
 		$(MAKE) -j1 AGENT_OS_ID=cs9-bootc e2e-agent-images; \
+		echo "Injecting attestation config into new disk..."; \
+		rm -f bin/.e2e-agent-injected; \
+		$(MAKE) prepare-e2e-qcow-config; \
+		echo "Booting VM with injected config..."; \
+		$(MAKE) -j1 agent-vm INJECT_CONFIG=false; \
+	elif test/scripts/check_attestation_in_qcow.sh bin/output/qcow2/disk.qcow2 2>/dev/null; then \
+		echo "Disk already has attestation enabled, booting without re-injection..."; \
+		$(MAKE) -j1 agent-vm INJECT_CONFIG=false; \
+	else \
+		echo "Disk exists but lacks attestation config, injecting..."; \
+		rm -f bin/.e2e-agent-injected; \
+		$(MAKE) prepare-e2e-qcow-config; \
+		echo "Booting VM with injected config..."; \
+		$(MAKE) -j1 agent-vm INJECT_CONFIG=false; \
 	fi
-	$(MAKE) -j1 agent-vm
 	@echo ""
 	@echo "=========================================="
 	@echo "Agent VM Running!"
