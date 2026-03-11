@@ -210,6 +210,13 @@ var defaultExcludes = []string{
 
 	// OSTree repository refs
 	"/sysroot/ostree/repo/refs/.*",
+
+	// Lock files (created during file modifications)
+	".*/\\.#.*",
+
+	// FlightCTL agent temporary files
+	"/var/lib/flightctl/\\..*",
+	"/var/lib/flightctl/certs/\\..*",
 }
 
 // LoadExcludes reads exclude patterns from a file
