@@ -214,9 +214,83 @@ var defaultExcludes = []string{
 	// Lock files (created during file modifications)
 	".*/\\.#.*",
 
-	// FlightCTL agent temporary files
-	"/var/lib/flightctl/\\..*",
-	"/var/lib/flightctl/certs/\\..*",
+	// FlightCTL agent temporary and state files
+	"/var/lib/flightctl/.*",   // All FlightCTL state files (current.json, desired.json, etc.)
+	"/var/lib/flightctl/certs/.*",
+
+	// Runtime-generated configuration files (created at boot/first-run)
+	// These files are not present in the container image and are generated
+	// when the system boots or the agent first runs
+	"/etc/adjtime",                    // System clock drift adjustment
+	"/etc/chrony\\.conf",              // Chrony time sync config
+	"/etc/chrony\\.keys",
+	"/etc/environment",                // Environment variables
+	"/etc/exports",                    // NFS exports
+	"/etc/flightctl/config\\.yaml",   // FlightCTL agent config
+	"/etc/host\\.conf",                // Hostname resolution order
+	"/etc/hosts",                      // Static hostname mapping
+	"/etc/idmapd\\.conf",              // NFSv4 ID mapping
+	"/etc/issue",                      // Pre-login message
+	"/etc/issue\\.d/.*",               // Issue message fragments
+	"/etc/kdump\\.conf",               // Kernel crash dump config
+	"/etc/ld\\.so\\.cache",            // Dynamic linker cache
+	"/etc/ld\\.so\\.conf",             // Dynamic linker config
+	"/etc/locale\\.conf",              // System locale
+	"/etc/login\\.defs",               // Login configuration
+	"/etc/lvm/.*",                     // LVM configuration
+	"/etc/modprobe\\.d/.*",            // Kernel module config
+	"/etc/containers/storage\\.conf", // Container storage config
+	"/etc/dbus-1/.*",                  // D-Bus configuration
+	"/etc/gss/.*",                     // GSS-API configuration
+	"/etc/netconfig",                  // Network configuration
+	"/etc/NetworkManager/.*",          // NetworkManager configs
+	"/etc/nfs\\.conf",                 // NFS configuration
+	"/etc/nsswitch\\.conf",            // Name service switch
+	"/etc/protocols",                  // Network protocols
+	"/etc/rpc",                        // RPC services
+	"/etc/security/.*",                // Security configs (limits, namespace)
+	"/etc/services",                   // Network services
+
+	// Boot loader entries (generated per deployment)
+	"/boot/loader\\..*",
+	"/boot/loader/.*",
+
+	// Dracut runtime files (initramfs generation and boot)
+	"/dracut-state\\.sh",
+	"/dracut/.*",
+	".*/dracut-.*",              // Dracut binaries in /usr/bin
+	".*/dracut.*\\.sh",          // Dracut libraries
+	"/usr/lib/initrd-release",   // Initrd release info
+	"/usr/lib/.*-lib\\.sh",      // Network and other boot libraries
+	"/usr/lib/systemd/system-generators/dracut-.*",  // Dracut generators
+	"/usr/lib/systemd/system/.*dracut.*",            // Dracut systemd units
+	"/usr/sbin/initqueue",       // Dracut init queue
+
+	// Systemd runtime configuration
+	"/etc/systemd/.*",
+	"/etc/sysctl\\.conf",
+	"/etc/tmpfiles\\.d/.*",
+	"/usr/lib/tmpfiles\\.d/.*",
+	"/etc/sysconfig/.*",
+
+	// Systemd unit files that change at runtime or are initrd-specific
+	"/usr/lib/systemd/system/nm-.*initrd\\.service",      // NetworkManager initrd services (nm-initrd.service, nm-wait-online-initrd.service)
+	"/usr/lib/systemd/system/systemd-tmpfiles-setup\\.service", // Modified by tmpfiles
+	"/usr/lib/systemd/system/emergency\\.service",        // Emergency mode service
+	"/usr/lib/systemd/system/dbus\\.socket",              // D-Bus socket activation
+
+	// System caches
+	"/var/cache/.*",
+
+	// Filesystem and mount units
+	"/sysroot/etc/fstab",
+
+	// Additional system libraries and PAM modules
+	"/usr/lib64/gssproxy/.*",
+	"/usr/lib64/libcrack\\.so\\..*",
+	"/usr/lib64/libgssrpc\\.so\\..*",
+	"/usr/lib64/libpwquality\\.so\\..*",
+	"/usr/lib64/security/pam_.*\\.so",
 }
 
 // LoadExcludes reads exclude patterns from a file
