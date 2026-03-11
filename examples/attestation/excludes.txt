@@ -1,0 +1,139 @@
+# FlightCTL IMA Runtime Policy Excludes
+# These patterns match files that change between boots or deployments
+# and should not cause attestation failures.
+#
+# Format: One regex pattern per line matching full file paths
+# Lines starting with # are comments
+
+# Boot aggregates (always change)
+boot_aggregate
+
+# Temporary and runtime files
+.*/tmp/.*
+.*/\.cache/.*
+/var/tmp/.*
+/run/.*
+
+# Machine-specific system files that vary between boots
+.*/machine-id
+.*/resolv\.conf
+.*/hostname
+.*/localtime
+
+# Dracut initramfs files (change on kernel updates)
+.*/dracut/.*
+.*/initramfs.*
+
+# Container storage (podman/docker content changes)
+/var/lib/containers/.*
+.*/overlay/.*
+.*/diff/.*
+.*/merged/.*
+
+# NetworkManager runtime state
+/var/lib/NetworkManager/.*
+/etc/NetworkManager/system-connections/.*
+
+# SSH host keys (generated per-machine)
+.*/ssh/ssh_host_.*
+.*/\.ssh/.*
+
+# OSTree deployment files (change on upgrades)
+.*/ostree/deploy/.*/var/.*
+.*/ostree/repo/.*
+/sysroot/ostree/.*
+
+# Journal and log files
+.*/journal/.*
+/var/log/.*
+
+# Hardware and driver database (can change)
+.*/hwdb\.bin
+.*/modules\..*
+
+# Grub configuration (changes on kernel updates)
+.*/grub.*
+.*/grubenv
+
+# SELinux policy and context (can be updated)
+.*/selinux/.*
+.*/file_contexts.*
+
+# PAM and authentication
+.*/pam\.d/.*
+
+# Systemd runtime state  
+.*/systemd/.*\.wants/.*
+/var/lib/systemd/.*
+
+# Kernel modules (change on kernel updates)
+.*/lib/modules/.*
+
+# Certificates and crypto (can be updated)
+.*/pki/.*
+.*/ssl/certs/.*
+.*/ca-certificates/.*
+
+# DNF/RPM database (changes on package installs)
+.*/dnf/.*
+.*/rpm/.*
+/var/lib/rpm/.*
+
+# Udev rules
+.*/udev/.*
+
+# Firewall configuration
+.*/firewalld/.*
+
+# Network configuration
+.*/sysconfig/network-scripts/.*
+
+# Console and terminal
+.*/console/.*
+
+# Greenboot health check
+.*/greenboot/.*
+
+# RHSM subscription
+.*/rhsm/.*
+
+# udisks
+.*/udisks2/.*
+
+# Password and shadow files
+.*/passwd
+.*/shadow
+.*/group
+.*/gshadow
+
+# Config directories with variable content
+.*/conf\.d/.*
+
+# FlightCTL agent (changes on rebuild)
+.*/flightctl-agent
+
+# Kerberos libraries (seem to change between boots)
+.*/libgssapi_krb5\.so\..*
+.*/libk5crypto\.so\..*
+.*/libkrb5\.so\..*
+.*/libkrb5support\.so\..*
+
+# Python binaries and libraries (prelink/optimization changes)
+.*/python3\.9
+.*/libpython3\.9\.so\..*
+
+# Python bytecode cache (.pyc files change)
+.*/__pycache__/.*\.pyc
+
+# Python standard library modules
+.*/python3\.9/.*\.so
+.*/python3\.9/.*/__pycache__/.*
+
+# rpm-ostree binary
+.*/rpm-ostree
+
+# grub2-editenv binary
+.*/grub2-editenv
+
+# sshd binary
+.*/sshd

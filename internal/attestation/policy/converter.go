@@ -3,6 +3,7 @@ package policy
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -54,6 +55,171 @@ func DetectFormat(content string) (FormatType, error) {
 	}
 
 	return FormatUnknown, fmt.Errorf("unable to determine format: not valid JSON or allowlist")
+}
+
+// Default IMA runtime policy excludes
+// These patterns match files that change between boots or deployments
+var defaultExcludes = []string{
+	// Boot aggregates (always change)
+	"boot_aggregate",
+
+	// Temporary and runtime files
+	".*/tmp/.*",
+	".*/\\.cache/.*",
+	"/var/tmp/.*",
+	"/run/.*",
+
+	// Machine-specific system files
+	".*/machine-id",
+	".*/resolv\\.conf",
+	".*/hostname",
+	".*/localtime",
+
+	// Dracut initramfs files
+	".*/dracut/.*",
+	".*/initramfs.*",
+
+	// Container storage
+	"/var/lib/containers/.*",
+	".*/overlay/.*",
+	".*/diff/.*",
+	".*/merged/.*",
+
+	// NetworkManager runtime state
+	"/var/lib/NetworkManager/.*",
+	"/etc/NetworkManager/system-connections/.*",
+
+	// SSH host keys
+	".*/ssh/ssh_host_.*",
+	".*/\\.ssh/.*",
+
+	// OSTree deployment files
+	".*/ostree/deploy/.*/var/.*",
+	".*/ostree/repo/.*",
+	"/sysroot/ostree/.*",
+
+	// Journal and log files
+	".*/journal/.*",
+	"/var/log/.*",
+
+	// Hardware and driver database
+	".*/hwdb\\.bin",
+	".*/modules\\..*",
+
+	// Grub configuration
+	".*/grub.*",
+	".*/grubenv",
+
+	// SELinux policy
+	".*/selinux/.*",
+	".*/file_contexts.*",
+
+	// PAM and authentication
+	".*/pam\\.d/.*",
+
+	// Systemd runtime state
+	".*/systemd/.*\\.wants/.*",
+	"/var/lib/systemd/.*",
+
+	// Kernel modules
+	".*/lib/modules/.*",
+
+	// Certificates and crypto
+	".*/pki/.*",
+	".*/ssl/certs/.*",
+	".*/ca-certificates/.*",
+
+	// DNF/RPM database
+	".*/dnf/.*",
+	".*/rpm/.*",
+	"/var/lib/rpm/.*",
+
+	// Udev rules
+	".*/udev/.*",
+
+	// Firewall configuration
+	".*/firewalld/.*",
+
+	// Network configuration
+	".*/sysconfig/network-scripts/.*",
+
+	// Console and terminal
+	".*/console/.*",
+
+	// Greenboot health check
+	".*/greenboot/.*",
+
+	// RHSM subscription
+	".*/rhsm/.*",
+
+	// udisks
+	".*/udisks2/.*",
+
+	// Password and shadow files
+	".*/passwd",
+	".*/shadow",
+	".*/group",
+	".*/gshadow",
+
+	// Config directories
+	".*/conf\\.d/.*",
+
+	// FlightCTL agent (changes on rebuild)
+	".*/flightctl-agent",
+
+	// Kerberos libraries (change between boots)
+	".*/libgssapi_krb5\\.so\\..*",
+	".*/libk5crypto\\.so\\..*",
+	".*/libkrb5\\.so\\..*",
+	".*/libkrb5support\\.so\\..*",
+
+	// Python binaries and libraries
+	".*/python3\\.9",
+	".*/libpython3\\.9\\.so\\..*",
+
+	// Python bytecode cache
+	".*/__pycache__/.*\\.pyc",
+
+	// Python standard library modules
+	".*/python3\\.9/.*\\.so",
+	".*/python3\\.9/.*/__pycache__/.*",
+
+	// System binaries that change
+	".*/rpm-ostree",
+	".*/grub2-editenv",
+	".*/sshd",
+}
+
+// LoadExcludes reads exclude patterns from a file
+// The file should have one regex pattern per line, with # for comments
+func LoadExcludes(excludesPath string) ([]string, error) {
+	// If path doesn't exist, return default excludes
+	if _, err := os.Stat(excludesPath); os.IsNotExist(err) {
+		return defaultExcludes, nil
+	}
+
+	content, err := os.ReadFile(excludesPath)
+	if err != nil {
+		return defaultExcludes, nil
+	}
+
+	var excludes []string
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		excludes = append(excludes, line)
+	}
+
+	// If file is empty, return defaults
+	if len(excludes) == 0 {
+		return defaultExcludes, nil
+	}
+
+	return excludes, nil
 }
 
 // ParseAllowlist converts allowlist format to RuntimePolicy
@@ -108,6 +274,10 @@ func ParseAllowlist(content string) (*RuntimePolicy, error) {
 	// For ima-ng templates, this is always sha1.
 	templateHashAlg := "sha1"
 
+	// Use default excludes embedded in the code
+	// These can be overridden by reading from a file in the future
+	excludes := defaultExcludes
+
 	policy := &RuntimePolicy{
 		Meta: Meta{
 			Version:   1,
@@ -116,7 +286,7 @@ func ParseAllowlist(content string) (*RuntimePolicy, error) {
 		},
 		Release:  0,
 		Digests:  digests,
-		Excludes: []string{},
+		Excludes: excludes,
 		Keyrings: make(map[string][]string),
 		IMA: IMAConfig{
 			IgnoredKeyrings: []string{},
