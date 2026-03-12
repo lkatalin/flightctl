@@ -171,9 +171,6 @@ var defaultExcludes = []string{
 	// Config directories
 	".*/conf\\.d/.*",
 
-	// FlightCTL agent (changes on rebuild)
-	".*/flightctl-agent",
-
 	// Kerberos libraries (change between boots)
 	".*/libgssapi_krb5\\.so\\..*",
 	".*/libk5crypto\\.so\\..*",
