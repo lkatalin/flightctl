@@ -219,6 +219,7 @@ attestation-policy:
 	@echo "  bin/flightctl apply -f examples/attestation/attestation-reference-20260311-132737.yaml"
 
 # Build agent-vm with the specific container image that matches measurements.txt
+# Automatically detects CA certificate changes and re-injects config when needed
 attestation-agent-vm:
 	@echo "Building agent VM with attestation config and default bootc image..."
 	@echo "Ensuring attestation-enabled config is generated and injected..."
@@ -232,14 +233,20 @@ attestation-agent-vm:
 		$(MAKE) prepare-e2e-qcow-config; \
 		echo "Booting VM with injected config..."; \
 		$(MAKE) -j1 agent-vm INJECT_CONFIG=false; \
-	elif test/scripts/check_attestation_in_qcow.sh bin/output/qcow2/disk.qcow2 2>/dev/null; then \
-		echo "Disk already has attestation enabled, booting without re-injection..."; \
-		$(MAKE) -j1 agent-vm INJECT_CONFIG=false; \
-	else \
+	elif ! test/scripts/check_attestation_in_qcow.sh bin/output/qcow2/disk.qcow2 2>/dev/null; then \
 		echo "Disk exists but lacks attestation config, injecting..."; \
 		rm -f bin/.e2e-agent-injected; \
 		$(MAKE) prepare-e2e-qcow-config; \
 		echo "Booting VM with injected config..."; \
+		$(MAKE) -j1 agent-vm INJECT_CONFIG=false; \
+	elif [ -f bin/e2e-certs/ca.pem ] && [ bin/e2e-certs/ca.pem -nt bin/.e2e-agent-injected ]; then \
+		echo "CA certificate updated since last injection, re-injecting config..."; \
+		rm -f bin/.e2e-agent-injected; \
+		$(MAKE) prepare-e2e-qcow-config; \
+		echo "Booting VM with updated config..."; \
+		$(MAKE) -j1 agent-vm INJECT_CONFIG=false; \
+	else \
+		echo "Disk has attestation config with current CA, booting without re-injection..."; \
 		$(MAKE) -j1 agent-vm INJECT_CONFIG=false; \
 	fi
 	@echo ""
@@ -257,11 +264,26 @@ configure-attestation-tpm-cas:
 	@echo "Configuring TPM CA certificates for attestation verification..."
 	test/scripts/add-certs-to-deployment.sh bin/tpm-cas
 
-# Complete attestation demo: deploys server, applies policy, boots agent VM
-attestation-demo: attestation-server wait-for-server attestation-policy
+# Attestation server + policy (no agent VM)
+attestation-server-policy: attestation-server wait-for-server attestation-policy
 	@echo ""
 	@echo "=========================================="
-	@echo "Attestation Demo Environment Ready!"
+	@echo "Attestation Server Ready!"
+	@echo "=========================================="
+	@echo ""
+	@echo "✓ FlightCTL API server configured for attestation"
+	@echo "✓ Custom Keylime verifier (master branch) deployed and running"
+	@echo "✓ TPM CA certificates configured"
+	@echo "✓ Attestation policy 'default-ima-policy' applied"
+	@echo ""
+	@echo "Next step: Boot agent VM with 'make attestation-agent-vm'"
+	@echo ""
+
+# Complete attestation demo: server + policy + agent VM
+attestation-demo: attestation-server-policy attestation-agent-vm
+	@echo ""
+	@echo "=========================================="
+	@echo "Complete Attestation Demo Running!"
 	@echo "=========================================="
 	@echo ""
 	@echo "✓ FlightCTL API server configured for attestation"
@@ -281,27 +303,36 @@ attestation-demo-deploy-helm: attestation-server
 attestation-demo-agent-vm: attestation-agent-vm
 attestation-demo-apply-policy: attestation-policy
 
-clean-attestation-demo: clean-agent-vm clean-cluster
-	@echo "Removing agent bundle, RPM, and build caches to force rebuild..."
-	rm -rf bin/agent-artifacts/
-	rm -rf bin/rpm/flightctl-agent-*.rpm
-	rm -rf bin/.rpm
-	rm -rf bin/osbuild-cache/
-	rm -rf bin/output/
-	rm -f bin/.e2e-agent-images-*
-	rm -f bin/.e2e-agent-certs
-	rm -f bin/.e2e-agent-injected
+# Clean only the attestation server (cluster), preserve all agent artifacts
+clean-attestation-server: clean-cluster
+	@echo "Attestation server cleaned (agent artifacts preserved)"
 
-# Rebuild agent from source with cache clearing to pick up code changes
-attestation-demo-rebuild-agent: attestation-server wait-for-server
+# Clean both server and agent VM, but preserve disk image and measurements
+# Use this for redeploying the demo without rebuilding the agent
+clean-attestation-demo: clean-agent-vm clean-attestation-server
+	@echo ""
 	@echo "=========================================="
-	@echo "Rebuilding Agent from Source"
+	@echo "Attestation Demo Cleaned"
+	@echo "=========================================="
+	@echo ""
+	@echo "✓ Server cluster removed"
+	@echo "✓ Agent VM stopped"
+	@echo "✓ Disk image preserved: bin/output/qcow2/disk.qcow2"
+	@echo "✓ Measurements preserved: examples/attestation/measurements-*.txt"
+	@echo ""
+	@echo "Run 'make attestation-demo' to redeploy with existing artifacts"
+
+# Rebuild agent disk image from source with new measurements (no policy apply)
+rebuild-attestation-agent-disk:
+	@echo ""
+	@echo "=========================================="
+	@echo "Rebuilding Agent Disk Image"
 	@echo "=========================================="
 	@echo ""
 	@echo "Step 1: Clearing Go build cache..."
 	@go clean -cache
 	@echo ""
-	@echo "Step 2: Removing agent bundle, RPM, disk image, and build caches to force rebuild..."
+	@echo "Step 2: Removing agent bundle, RPM, disk image, and build caches..."
 	rm -rf bin/agent-artifacts/
 	rm -rf bin/rpm/flightctl-agent-*.rpm
 	rm -rf bin/.rpm
@@ -314,29 +345,90 @@ attestation-demo-rebuild-agent: attestation-server wait-for-server
 	@echo "Step 3: Rebuilding agent RPM and disk image from source..."
 	$(MAKE) AGENT_OS_ID=cs9-bootc e2e-agent-images
 	@echo ""
-	@echo "Step 4: Generating new measurements.txt from rebuilt image..."
-	@echo "  (This happens automatically during e2e-agent-images)"
+	@echo "Step 4: Creating AttestationReference from new measurements..."
+	examples/attestation/create-attestation-ref-from-measurements.sh
 	@echo ""
-		@echo "Step 5: Creating AttestationReference from new measurements..."
-		examples/attestation/create-attestation-ref-from-measurements.sh
-		@echo ""
-		@echo "Step 6: Applying updated AttestationReference..."
-		bin/flightctl apply -f examples/attestation/attestation-reference-20260311-132737.yaml
+	@echo "=========================================="
+	@echo "Agent Disk Rebuilt!"
+	@echo "=========================================="
 	@echo ""
-	@echo "Step 7: Starting agent VM..."
+	@echo "✓ New disk image: bin/output/qcow2/disk.qcow2"
+	@echo "✓ New measurements: examples/attestation/measurements-*.txt"
+	@echo "✓ AttestationReference updated"
+	@echo ""
+	@echo "Next step: Apply policy with 'make apply-attestation-policy'"
+
+# Rebuild agent disk + apply policy (assumes server is running)
+rebuild-attestation-agent-disk-policy: rebuild-attestation-agent-disk
+	@echo ""
+	@echo "Applying updated AttestationReference..."
+	bin/flightctl apply -f examples/attestation/attestation-reference-from-measurements.yaml
+	@echo ""
+	@echo "✓ AttestationReference applied successfully"
+
+# Complete agent rebuild workflow: disk + policy + VM (assumes server is running)
+rebuild-attestation-agent: rebuild-attestation-agent-disk-policy
+	@echo ""
+	@echo "Starting agent VM with rebuilt disk..."
 	$(MAKE) attestation-agent-vm
 	@echo ""
 	@echo "==========================================="
 	@echo "Agent Rebuilt and Running!"
 	@echo "==========================================="
 	@echo ""
-	@echo "✓ Agent rebuilt from latest source code with all caches cleared"
-	@echo "✓ Podman container images regenerated from scratch"
-	@echo "✓ New measurements.txt generated"
-	@echo "✓ AttestationReference updated with new measurements"
+	@echo "✓ Agent disk rebuilt from source"
+	@echo "✓ New measurements extracted"
+	@echo "✓ AttestationReference applied"
 	@echo "✓ Agent VM running with vTPM"
 	@echo ""
-	@echo "Monitor attestation in server logs to verify PCR selection"
+	@echo "Monitor server logs to verify attestation"
+
+# Alias for applying attestation policy
+apply-attestation-policy: attestation-policy
+
+# Clean everything including disk image (alias for backward compatibility)
+clean-attestation-demo-full: clean-agent-vm clean-cluster
+	@echo "Removing agent bundle, RPM, and build caches..."
+	rm -rf bin/agent-artifacts/
+	rm -rf bin/rpm/flightctl-agent-*.rpm
+	rm -rf bin/.rpm
+	rm -rf bin/osbuild-cache/
+	rm -rf bin/output/
+	rm -f bin/.e2e-agent-images-*
+	rm -f bin/.e2e-agent-certs
+	rm -f bin/.e2e-agent-injected
+	@echo ""
+	@echo "=========================================="
+	@echo "Full Clean Complete"
+	@echo "=========================================="
+	@echo ""
+	@echo "All agent artifacts removed."
+	@echo "Use 'make rebuild-attestation-agent-disk' to rebuild the agent disk image."
+
+# Full rebuild workflow: server + agent rebuild + policy + VM
+# This deploys a fresh server AND rebuilds the agent from source
+# Use this for "Option B" testing (does rebuilding produce matching measurements?)
+attestation-demo-rebuild-agent: attestation-server-policy
+	@echo ""
+	@echo "=========================================="
+	@echo "Full Rebuild: Server + Agent"
+	@echo "=========================================="
+	@echo ""
+	@echo "Server deployed. Now rebuilding agent from source..."
+	@echo ""
+	$(MAKE) rebuild-attestation-agent
+	@echo ""
+	@echo "==========================================="
+	@echo "Full Rebuild Complete!"
+	@echo "==========================================="
+	@echo ""
+	@echo "✓ Fresh server deployed with attestation"
+	@echo "✓ Agent rebuilt from latest source code"
+	@echo "✓ New measurements extracted"
+	@echo "✓ Updated AttestationReference applied"
+	@echo "✓ Agent VM running with vTPM"
+	@echo ""
+	@echo "Monitor server logs to verify attestation (expecting zero errors)"
 
 # Apply attestation policy from measurements.txt
 attestation-demo-apply-policy:
@@ -348,4 +440,4 @@ attestation-demo-apply-policy:
 	@echo ""
 	@echo "Using measurements from measurements.txt (automatically generated from disk image)"
 
-PHONY: deploy-db deploy cluster services-container run-services-container clean-services-container attestation-server wait-for-server attestation-policy attestation-agent-vm attestation-demo prepare-agent-config-attestation configure-attestation-tpm-cas clean-attestation-demo attestation-demo-rebuild-agent attestation-demo-deploy-helm attestation-demo-apply-policy
+PHONY: deploy-db deploy cluster services-container run-services-container clean-services-container attestation-server wait-for-server attestation-policy apply-attestation-policy attestation-agent-vm attestation-server-policy attestation-demo prepare-agent-config-attestation configure-attestation-tpm-cas clean-attestation-server clean-attestation-demo clean-attestation-demo-full rebuild-attestation-agent-disk rebuild-attestation-agent-disk-policy rebuild-attestation-agent attestation-demo-rebuild-agent attestation-demo-deploy-helm attestation-demo-apply-policy
