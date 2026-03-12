@@ -203,7 +203,7 @@ wait-for-server:
 # Apply example attestation policy (allowlist format)
 attestation-policy:
 	@echo "Applying AttestationReference from measurements.txt..."
-	bin/flightctl apply -f examples/attestation/attestation-reference-from-measurements.yaml
+	bin/flightctl apply -f examples/attestation/attestation-reference-20260311-132737.yaml
 	@echo ""
 	@echo "=========================================="
 	@echo "Attestation Policy Applied!"
@@ -216,7 +216,7 @@ attestation-policy:
 	@echo ""
 	@echo "To use the full measurements.txt baseline instead:"
 	@echo "  cd examples/attestation && ./create-attestation-ref-from-measurements.sh"
-	@echo "  bin/flightctl apply -f examples/attestation/attestation-reference-from-measurements.yaml"
+	@echo "  bin/flightctl apply -f examples/attestation/attestation-reference-20260311-132737.yaml"
 
 # Build agent-vm with the specific container image that matches measurements.txt
 attestation-agent-vm:
@@ -321,7 +321,7 @@ attestation-demo-rebuild-agent: attestation-server wait-for-server
 		examples/attestation/create-attestation-ref-from-measurements.sh
 		@echo ""
 		@echo "Step 6: Applying updated AttestationReference..."
-		bin/flightctl apply -f examples/attestation/attestation-reference-from-measurements.yaml
+		bin/flightctl apply -f examples/attestation/attestation-reference-20260311-132737.yaml
 	@echo ""
 	@echo "Step 7: Starting agent VM..."
 	$(MAKE) attestation-agent-vm
@@ -341,7 +341,7 @@ attestation-demo-rebuild-agent: attestation-server wait-for-server
 # Apply attestation policy from measurements.txt
 attestation-demo-apply-policy:
 	@echo "Applying AttestationReference from measurements.txt..."
-	bin/flightctl apply -f examples/attestation/attestation-reference-from-measurements.yaml
+	bin/flightctl apply -f examples/attestation/attestation-reference-20260311-132737.yaml
 	@echo ""
 	@echo "AttestationReference 'default-ima-policy' created!"
 	@echo "All enrollments with attestation data will be verified against this policy."
