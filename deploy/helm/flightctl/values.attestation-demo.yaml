@@ -2,7 +2,7 @@
 # This enables TPM attestation with Keylime verifier in REAL MODE
 #
 # When applied, this will:
-# - Deploy official Keylime verifier container (quay.io/keylime/keylime_verifier)
+# - Deploy official Keylime verifier container (quay.io/keylime/keylime_verifier:master)
 # - Perform actual cryptographic verification of TPM attestation data
 # - Only approve enrollments if attestation data matches the AttestationReference policy
 #
@@ -11,11 +11,10 @@
 # Enable Keylime verifier for REAL attestation verification
 keylime:
   enabled: true
-  # Use custom Keylime verifier image built from master branch with v2.4 API support
+  # Use official Keylime verifier image from master branch with v2.5 API support
   image:
-    repository: localhost/keylime_verifier
-    tag: master-3a3cfa9
-    # IMPORTANT: Use 'Never' for localhost images in kind cluster to avoid pulling from registry
-    pullPolicy: Never
+    repository: quay.io/keylime/keylime_verifier
+    tag: master
+    pullPolicy: IfNotPresent
 
 # Use development settings from values.dev.yaml as base

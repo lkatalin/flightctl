@@ -1,5 +1,5 @@
 # Dockerfile to build Keylime verifier from latest upstream/master
-# This ensures we have the most recent changes including v2.4 API updates
+# This ensures we have the most recent changes including v2.5 API updates
 
 FROM registry.fedoraproject.org/fedora:latest
 

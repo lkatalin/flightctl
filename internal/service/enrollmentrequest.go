@@ -261,7 +261,7 @@ func (h *ServiceHandler) processAttestationWithKeylime(ctx context.Context, orgI
 		return nil
 	}
 
-	// Check if TPM Quote is present (required for v2.4 one-shot verification)
+	// Check if TPM Quote is present (required for v2.5 one-shot verification)
 	if attestationPkg.Data.Quote == nil || *attestationPkg.Data.Quote == "" {
 		h.log.Warnf("Attestation package for %s missing required TPM Quote", attestationPkg.Metadata.EnrollmentRequestName)
 		condition := domain.Condition{
@@ -274,7 +274,7 @@ func (h *ServiceHandler) processAttestationWithKeylime(ctx context.Context, orgI
 		return nil
 	}
 
-	// Check if Nonce is present (required for v2.4 one-shot verification)
+	// Check if Nonce is present (required for v2.5 one-shot verification)
 	if attestationPkg.Data.Nonce == nil || *attestationPkg.Data.Nonce == "" {
 		h.log.Warnf("Attestation package for %s missing required Nonce", attestationPkg.Metadata.EnrollmentRequestName)
 		condition := domain.Condition{

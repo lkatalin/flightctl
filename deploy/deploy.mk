@@ -157,15 +157,7 @@ endif
 attestation-server: cluster build-cli
 	kubectl config set-context kind-kind
 	test/scripts/install_helm.sh
-	@echo "Loading custom Keylime verifier image into kind cluster..."
-	@if podman image exists localhost/keylime_verifier:master-3a3cfa9; then \
-		podman save localhost/keylime_verifier:master-3a3cfa9 | kind load image-archive /dev/stdin --name kind; \
-		echo "✓ Keylime verifier image loaded successfully"; \
-	else \
-		echo "⚠ Warning: localhost/keylime_verifier:master-3a3cfa9 not found in podman images"; \
-		echo "  The deployment may fail. Build it first or use the official image."; \
-	fi
-	@echo "Deploying with attestation demo configuration (custom Keylime verifier from master)..."
+	@echo "Deploying with attestation demo configuration (Keylime verifier from quay.io/keylime/keylime_verifier:master)..."
 	EXTRA_VALUES_FILE=./deploy/helm/flightctl/values.attestation-demo.yaml test/scripts/deploy_with_helm.sh --db-size $(DB_SIZE)
 	$(MAKE) configure-attestation-tpm-cas
 	@echo ""
@@ -174,7 +166,7 @@ attestation-server: cluster build-cli
 	@echo "=========================================="
 	@echo ""
 	@echo "✓ FlightCTL API server configured for attestation"
-	@echo "✓ Custom Keylime verifier (master branch) deployed and running"
+	@echo "✓ Keylime verifier (master branch) deployed and running"
 	@echo "✓ TPM CA certificates configured"
 	@echo ""
 	@echo "Next step: Apply attestation policy with 'make attestation-policy'"

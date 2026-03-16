@@ -18,11 +18,11 @@ tags:
   - name: attestation
     description: Operations for TPM attestation verification via Keylime.
 paths:
-  /v2.4/verify/evidence:
+  /v2.5/verify/evidence:
     post:
       tags:
         - attestation
-      description: Verify TPM attestation evidence (one-shot verification, v2.4 API)
+      description: Verify TPM attestation evidence (one-shot verification, v2.5 API)
       operationId: verifyEvidence
       requestBody:
         required: true
@@ -91,7 +91,7 @@ components:
   schemas:
     VerifyEvidenceRequest:
       type: object
-      description: Request to verify TPM evidence using v2.4 one-shot verification API (latest master branch format with nested data)
+      description: Request to verify TPM evidence using v2.5 one-shot verification API (latest master branch format with nested data)
       properties:
         type:
           type: string
@@ -142,7 +142,7 @@ components:
         - data
     VerifyEvidenceResponse:
       type: object
-      description: Response from v2.4 one-shot evidence verification (latest master branch format)
+      description: Response from v2.5 one-shot evidence verification (latest master branch format)
       properties:
         code:
           type: integer

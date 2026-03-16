@@ -4,7 +4,7 @@ This directory contains files to build a Keylime verifier image from the latest 
 
 ## Why Build from Master?
 
-The pre-built `quay.io/keylime/keylime_verifier:latest` image may not include the most recent changes from the Keylime repository. To ensure you have the latest features and fixes (including v2.4 API updates), build from the upstream master branch.
+The pre-built `quay.io/keylime/keylime_verifier:latest` image may not include the most recent changes from the Keylime repository. To ensure you have the latest features and fixes (including v2.5 API updates), build from the upstream master branch.
 
 ## Quick Start
 
@@ -49,7 +49,7 @@ The Dockerfile:
 - Uses Fedora base image (Keylime's recommended distro)
 - Clones the latest Keylime from https://github.com/keylime/keylime master branch
 - Installs all dependencies
-- Runs the verifier with latest code including v2.4 API support
+- Runs the verifier with latest code including v2.5 API support
 
 ## Updating to Latest Master
 
@@ -66,7 +66,7 @@ kind load docker-image keylime-verifier:master
 
 ## Verifying the Build
 
-Check that you have the v2.4 API:
+Check that you have the v2.5 API:
 
 ```bash
 # After deploying, check the API version
