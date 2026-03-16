@@ -254,6 +254,17 @@ attestation-agent-vm:
 # Configure TPM CA certificates for attestation verification
 configure-attestation-tpm-cas:
 	@echo "Configuring TPM CA certificates for attestation verification..."
+	@# Create bin/tpm-cas directory and populate with test swtpm CA if it doesn't exist
+	@if [ ! -d bin/tpm-cas ] || [ -z "$$(ls -A bin/tpm-cas/*.pem 2>/dev/null)" ]; then \
+		echo "Creating bin/tpm-cas directory and generating test swtpm CA certificates..."; \
+		mkdir -p bin/tpm-cas bin/swtpm-ca; \
+		test/scripts/create-test-swtpm-ca.sh bin/swtpm-ca; \
+		cp bin/swtpm-ca/swtpm-localca-rootca-cert.pem bin/tpm-cas/; \
+		cp bin/swtpm-ca/issuercert.pem bin/tpm-cas/swtpm-localca-issuer-cert.pem; \
+		echo "✓ Test swtpm CA certificates created in bin/tpm-cas/"; \
+	else \
+		echo "✓ TPM CA certificates already exist in bin/tpm-cas/"; \
+	fi
 	test/scripts/add-certs-to-deployment.sh bin/tpm-cas
 
 # Attestation server + policy (no agent VM)
