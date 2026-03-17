@@ -231,14 +231,14 @@ attestation-agent-vm:
 		$(MAKE) prepare-e2e-qcow-config; \
 		echo "Booting VM with injected config..."; \
 		$(MAKE) -j1 agent-vm INJECT_CONFIG=false; \
-	elif [ -f bin/e2e-certs/ca.pem ] && [ bin/e2e-certs/ca.pem -nt bin/.e2e-agent-injected ]; then \
-		echo "CA certificate updated since last injection, re-injecting config..."; \
+	elif [ -f bin/agent/etc/flightctl/config.yaml ] && [ ! -f bin/.e2e-agent-injected -o bin/agent/etc/flightctl/config.yaml -nt bin/.e2e-agent-injected ]; then \
+		echo "Agent config updated since last injection, re-injecting config..."; \
 		rm -f bin/.e2e-agent-injected; \
 		$(MAKE) prepare-e2e-qcow-config; \
 		echo "Booting VM with updated config..."; \
 		$(MAKE) -j1 agent-vm INJECT_CONFIG=false; \
 	else \
-		echo "Disk has attestation config with current CA, booting without re-injection..."; \
+		echo "Disk has current agent config, booting without re-injection..."; \
 		$(MAKE) -j1 agent-vm INJECT_CONFIG=false; \
 	fi
 	@echo ""
@@ -268,7 +268,8 @@ configure-attestation-tpm-cas:
 	test/scripts/add-certs-to-deployment.sh bin/tpm-cas
 
 # Attestation server + policy (no agent VM)
-attestation-server-policy: attestation-server wait-for-server attestation-policy
+# Automatically generates agent config after server is ready
+attestation-server-policy: attestation-server wait-for-server prepare-agent-config-attestation attestation-policy
 	@echo ""
 	@echo "=========================================="
 	@echo "Attestation Server Ready!"
@@ -277,6 +278,7 @@ attestation-server-policy: attestation-server wait-for-server attestation-policy
 	@echo "✓ FlightCTL API server configured for attestation"
 	@echo "✓ Custom Keylime verifier (master branch) deployed and running"
 	@echo "✓ TPM CA certificates configured"
+	@echo "✓ Agent config generated with current server certificates"
 	@echo "✓ Attestation policy 'default-ima-policy' applied"
 	@echo ""
 	@echo "Next step: Boot agent VM with 'make attestation-agent-vm'"

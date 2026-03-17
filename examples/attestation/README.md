@@ -132,6 +132,8 @@ kubectl apply -f attestation-ref.yaml
   - Ubuntu/Debian: `sudo apt-get install virt-manager libvirt-daemon-system qemu-kvm && sudo systemctl enable --now libvirtd`
   - Add your user to libvirt group: `sudo usermod -aG libvirt $USER` (requires logout/login)
 
+**⚠️ Important:** If you encounter certificate errors, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#certificate-mismatch-errors)
+
 Run the complete attestation demo with one command:
 
 ```bash
