@@ -389,6 +389,67 @@ rebuild-attestation-agent: rebuild-attestation-agent-disk-policy
 # Alias for applying attestation policy
 apply-attestation-policy: attestation-policy
 
+# Rebuild qcow2 disk image from existing container bundle (for reproducibility testing)
+# This loads the bundle into podman and runs bootc-image-builder to create a fresh qcow2
+# Usage: make rebuild-qcow2-from-bundle [AGENT_OS_ID=cs9-bootc]
+rebuild-qcow2-from-bundle: AGENT_OS_ID ?= cs9-bootc
+rebuild-qcow2-from-bundle:
+	@BUNDLE_PATH="bin/agent-artifacts/agent-images-bundle-$(AGENT_OS_ID).tar"; \
+	if [ ! -f "$$BUNDLE_PATH" ]; then \
+		echo "Error: Container bundle not found at $$BUNDLE_PATH"; \
+		echo "Run 'make AGENT_OS_ID=$(AGENT_OS_ID) e2e-agent-images' first to create the bundle."; \
+		exit 1; \
+	fi; \
+	echo "Loading container images from bundle into root podman context..."; \
+	sudo podman load -i "$$BUNDLE_PATH" >/dev/null; \
+	echo ""; \
+	echo "Finding base image from bundle..."; \
+	BASE_IMAGE=$$(sudo podman images --filter "label=io.flightctl.e2e.component=device" --format "{{.Repository}}:{{.Tag}}" | grep "base-$(AGENT_OS_ID)" | head -1); \
+	if [ -z "$$BASE_IMAGE" ]; then \
+		echo "Error: No base-$(AGENT_OS_ID) image found in bundle"; \
+		exit 1; \
+	fi; \
+	echo "Using base image: $$BASE_IMAGE"; \
+	echo ""; \
+	echo "Removing old qcow2 if it exists..."; \
+	sudo rm -rf bin/output/agent-qcow2-$(AGENT_OS_ID); \
+	rm -f bin/output/qcow2/disk.qcow2; \
+	echo ""; \
+	echo "Rebuilding qcow2 from container image (this may take 5-10 minutes)..."; \
+	mkdir -p bin/output/agent-qcow2-$(AGENT_OS_ID); \
+	mkdir -p bin/dnf-cache bin/osbuild-cache; \
+	sudo podman run --rm \
+		-it \
+		--privileged \
+		--pull=newer \
+		--security-opt label=type:unconfined_t \
+		-v "$$(pwd)/bin/output/agent-qcow2-$(AGENT_OS_ID)":/output \
+		-v "$$(pwd)/bin/dnf-cache":/var/cache/dnf:Z \
+		-v "$$(pwd)/bin/osbuild-cache":/var/cache/osbuild:Z \
+		-v /var/lib/containers/storage:/var/lib/containers/storage \
+		quay.io/centos-bootc/bootc-image-builder:latest \
+		build \
+		--type qcow2 \
+		"$$BASE_IMAGE"; \
+	sudo chown -R "$$(id -un)":"$$(id -gn)" "bin/output/agent-qcow2-$(AGENT_OS_ID)"; \
+	if [ ! -f "bin/output/agent-qcow2-$(AGENT_OS_ID)/qcow2/disk.qcow2" ]; then \
+		echo "Error: qcow2 build failed - disk image not created"; \
+		exit 1; \
+	fi; \
+	echo ""; \
+	echo "Moving qcow2 to standard location..."; \
+	mkdir -p bin/output/qcow2; \
+	mv bin/output/agent-qcow2-$(AGENT_OS_ID)/qcow2/disk.qcow2 bin/output/qcow2/disk.qcow2; \
+	echo ""; \
+	echo "=========================================="; \
+	echo "QCOW2 Rebuilt from Bundle!"; \
+	echo "=========================================="; \
+	echo ""; \
+	echo "✓ Disk image: bin/output/qcow2/disk.qcow2"; \
+	echo ""; \
+	echo "Next step: Extract measurements and compare with baseline"; \
+	echo "  examples/attestation/extract-measurements-from-disk.sh"
+
 # Clean everything including disk image (alias for backward compatibility)
 clean-attestation-demo-full: clean-agent-vm clean-cluster
 	@echo "Removing agent bundle, RPM, and build caches..."
@@ -443,4 +504,4 @@ attestation-demo-apply-policy:
 	@echo ""
 	@echo "Using measurements from measurements.txt (automatically generated from disk image)"
 
-PHONY: deploy-db deploy cluster services-container run-services-container clean-services-container attestation-server wait-for-server attestation-policy apply-attestation-policy attestation-agent-vm attestation-server-policy attestation-demo prepare-agent-config-attestation configure-attestation-tpm-cas clean-attestation-server clean-attestation-demo clean-attestation-demo-full rebuild-attestation-agent-disk rebuild-attestation-agent-disk-policy rebuild-attestation-agent attestation-demo-rebuild-agent attestation-demo-deploy-helm attestation-demo-apply-policy
+PHONY: deploy-db deploy cluster services-container run-services-container clean-services-container attestation-server wait-for-server attestation-policy apply-attestation-policy attestation-agent-vm attestation-server-policy attestation-demo prepare-agent-config-attestation configure-attestation-tpm-cas clean-attestation-server clean-attestation-demo clean-attestation-demo-full rebuild-attestation-agent-disk rebuild-attestation-agent-disk-policy rebuild-attestation-agent attestation-demo-rebuild-agent attestation-demo-deploy-helm attestation-demo-apply-policy rebuild-qcow2-from-bundle
