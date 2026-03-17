@@ -126,6 +126,12 @@ kubectl apply -f attestation-ref.yaml
 
 ## Quick Start: Attestation Demo
 
+**Prerequisites:**
+- Libvirt virtualization tools (Linux host only):
+  - Fedora/RHEL: `sudo dnf install virt-install libvirt qemu-kvm && sudo systemctl enable --now libvirtd`
+  - Ubuntu/Debian: `sudo apt-get install virt-manager libvirt-daemon-system qemu-kvm && sudo systemctl enable --now libvirtd`
+  - Add your user to libvirt group: `sudo usermod -aG libvirt $USER` (requires logout/login)
+
 Run the complete attestation demo with one command:
 
 ```bash
