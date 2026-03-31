@@ -20,7 +20,13 @@ echo "Output: $OUTPUT_FILE"
 COUNT=$(wc -l < "$MEASUREMENTS_FILE")
 echo "Found $COUNT measurements"
 
+# Check if measurements have hash algorithm prefix (sha256:, sha1:, etc.)
+if head -1 "$MEASUREMENTS_FILE" | grep -q '^[a-z0-9]*:'; then
+    echo "Detected hash algorithm prefix, stripping it..."
+fi
+
 # Create YAML with embedded measurements
+# Strip hash algorithm prefix (sha256:, sha1:, etc.) if present
 cat > "$OUTPUT_FILE" <<EOF
 apiVersion: v1beta1
 kind: AttestationReference
@@ -36,7 +42,7 @@ spec:
   # Runtime policy with $COUNT IMA measurements
   # Auto-converted from allowlist format to Keylime JSON
   runtimePolicy: |
-$(cat "$MEASUREMENTS_FILE" | sed 's/^/    /')
+$(cat "$MEASUREMENTS_FILE" | sed 's/^[a-z0-9]*://' | sed 's/^/    /')
 
   # TPM policy includes PCRs 0-7 (boot measurements) and PCR 10 (IMA)
   # PCR 10 must be included for Keylime to perform IMA runtime verification
