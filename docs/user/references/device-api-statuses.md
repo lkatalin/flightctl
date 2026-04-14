@@ -258,19 +258,19 @@ The diagram below also shows "Decommissioning Requested" and "Decommissioning Re
 stateDiagram
     direction LR
         state Decommissioning {
-            [*] --> Decommissioning Requested
-            Decommissioning Requested --> Decommissioning Received
+            [*] --> Requested
+            Requested --> Received
         }
 
         state Decommissioned {
-            [*] --> Decommissioning Ended
+            [*] --> Ended
         }
 
-        state Decommissioning Received {
+        state Received {
             [*] --> Started
         }
 
-        state Decommissioning Ended {
+        state Ended {
             [*] --> Completed
             [*] --> Error
         }
